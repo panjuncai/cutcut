@@ -1,6 +1,7 @@
 #include "appcontroller.h"
 
 #include "screenshotoverlay.h"
+#include "pinnedshot.h"
 
 #include <QApplication>
 #include <QClipboard>
@@ -36,6 +37,7 @@ QIcon buildTrayIcon() {
 #ifdef Q_OS_MAC
 struct AppController::MacHotkeyData {
     EventHotKeyRef screenshotRef = nullptr;
+    EventHotKeyRef pinRef = nullptr;
     EventHandlerRef handlerRef = nullptr;
 };
 
@@ -77,10 +79,12 @@ void AppController::setupTray() {
 
     auto *menu = new QMenu;
     QAction *captureAction = menu->addAction(tr("Capture (F1)"));
+    QAction *pinAction = menu->addAction(tr("Pin last (F3)"));
     menu->addSeparator();
     QAction *quitAction = menu->addAction(tr("Quit"));
 
     connect(captureAction, &QAction::triggered, this, &AppController::startCapture);
+    connect(pinAction, &QAction::triggered, this, &AppController::pinCapture);
     connect(quitAction, &QAction::triggered, qApp, &QApplication::quit);
 
     tray_->setContextMenu(menu);
@@ -105,7 +109,8 @@ void AppController::startCapture() {
 
 void AppController::onCaptureConfirmed(const QPixmap &pixmap) {
     QGuiApplication::clipboard()->setPixmap(pixmap);
-    tray_->showMessage(tr("CutCut"), tr("Screenshot copied to clipboard."), QSystemTrayIcon::Information, 2000);
+    lastCapture_ = pixmap;
+    tray_->showMessage(tr("CutCut"), tr("Screenshot copied. Press F3 to pin."), QSystemTrayIcon::Information, 2000);
 }
 
 void AppController::onCaptureCanceled() {
@@ -120,6 +125,10 @@ bool AppController::registerHotkeys() {
     if (!RegisterHotKey(nullptr, ScreenshotHotkey, 0, VK_F1)) {
         return false;
     }
+    if (!RegisterHotKey(nullptr, PinHotkey, 0, VK_F3)) {
+        UnregisterHotKey(nullptr, ScreenshotHotkey);
+        return false;
+    }
     qApp->installNativeEventFilter(this);
     hotkeysRegistered_ = true;
     return true;
@@ -132,7 +141,12 @@ bool AppController::registerHotkeys() {
     InstallApplicationEventHandler(hotkeyHandler, 1, &eventSpec, this, &macHotkeys_->handlerRef);
 
     EventHotKeyID shotId{ 'cutc', ScreenshotHotkey };
+    EventHotKeyID pinId{ 'cutc', PinHotkey };
     if (RegisterEventHotKey(kVK_F1, 0, shotId, GetApplicationEventTarget(), 0, &macHotkeys_->screenshotRef) != noErr) {
+        unregisterHotkeys();
+        return false;
+    }
+    if (RegisterEventHotKey(kVK_F3, 0, pinId, GetApplicationEventTarget(), 0, &macHotkeys_->pinRef) != noErr) {
         unregisterHotkeys();
         return false;
     }
@@ -146,6 +160,7 @@ void AppController::unregisterHotkeys() {
 #ifdef Q_OS_WIN
     if (hotkeysRegistered_) {
         UnregisterHotKey(nullptr, ScreenshotHotkey);
+        UnregisterHotKey(nullptr, PinHotkey);
         qApp->removeNativeEventFilter(this);
         hotkeysRegistered_ = false;
     }
@@ -155,6 +170,9 @@ void AppController::unregisterHotkeys() {
     }
     if (macHotkeys_->screenshotRef) {
         UnregisterEventHotKey(macHotkeys_->screenshotRef);
+    }
+    if (macHotkeys_->pinRef) {
+        UnregisterEventHotKey(macHotkeys_->pinRef);
     }
     if (macHotkeys_->handlerRef) {
         RemoveEventHandler(macHotkeys_->handlerRef);
@@ -185,6 +203,22 @@ bool AppController::nativeEventFilter(const QByteArray &eventType, void *message
 void AppController::handleHotkey(int hotkeyId) {
     if (hotkeyId == ScreenshotHotkey) {
         startCapture();
+    } else if (hotkeyId == PinHotkey) {
+        pinCapture();
+    }
+}
+
+void AppController::pinCapture() {
+    if (lastCapture_.isNull()) {
+        tray_->showMessage(tr("CutCut"), tr("Take a screenshot first (F1)."), QSystemTrayIcon::Information, 2000);
+        return;
+    }
+    auto *pin = new PinnedShot(lastCapture_);
+    pin->show();
+    pins_.append(pin);
+    connect(pin, &QObject::destroyed, this, [this, pin]() { pins_.removeOne(pin); });
+    if (overlay_->hasSelection()) {
+        overlay_->dismiss();
     }
 }
 

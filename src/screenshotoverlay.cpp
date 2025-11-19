@@ -23,6 +23,7 @@ void ScreenshotOverlay::beginCapture(const QPixmap &screenPixmap, const QRect &v
     selectionRect_ = QRect();
     selecting_ = false;
     selectionAnchor_ = QPoint();
+    selectionLocked_ = false;
     setGeometry(virtualGeometry_);
     show();
     raise();
@@ -33,6 +34,7 @@ void ScreenshotOverlay::resetState() {
     selectionRect_ = QRect();
     selecting_ = false;
     selectionAnchor_ = QPoint();
+    selectionLocked_ = false;
     screenPixmap_ = QPixmap();
     hide();
 }
@@ -56,6 +58,9 @@ void ScreenshotOverlay::paintEvent(QPaintEvent *) {
 }
 
 void ScreenshotOverlay::mousePressEvent(QMouseEvent *event) {
+    if (selectionLocked_) {
+        return;
+    }
     if (event->button() != Qt::LeftButton) {
         return;
     }
@@ -104,12 +109,29 @@ void ScreenshotOverlay::finalizeSelection() {
         return;
     }
 
+    selectionRect_ = area;
+    selectionLocked_ = true;
     QPixmap result = screenPixmap_.copy(area);
-    resetState();
     emit captureConfirmed(result);
+    update();
 }
 
 void ScreenshotOverlay::cancelCaptureInternal() {
     resetState();
     emit captureCanceled();
+}
+
+void ScreenshotOverlay::dismiss() {
+    resetState();
+}
+
+bool ScreenshotOverlay::hasSelection() const {
+    return selectionLocked_ && !selectionRect_.isNull();
+}
+
+QPixmap ScreenshotOverlay::currentSelectionPixmap() const {
+    if (!hasSelection()) {
+        return {};
+    }
+    return screenPixmap_.copy(selectionRect_);
 }

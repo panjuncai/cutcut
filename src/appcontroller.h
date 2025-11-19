@@ -3,8 +3,10 @@
 #include <QAbstractNativeEventFilter>
 #include <QPixmap>
 #include <QSystemTrayIcon>
+#include <QVector>
 
 class ScreenshotOverlay;
+class PinnedShot;
 
 class AppController : public QObject, public QAbstractNativeEventFilter {
     Q_OBJECT
@@ -24,17 +26,20 @@ private slots:
     void onCaptureCanceled();
 
 private:
-    enum HotkeyId { ScreenshotHotkey = 1 };
+    enum HotkeyId { ScreenshotHotkey = 1, PinHotkey = 2 };
 
     void setupTray();
     void startCapture();
     bool registerHotkeys();
     void unregisterHotkeys();
+    void pinCapture();
     QRect virtualScreenGeometry() const;
     QPixmap captureVirtualScreen(const QRect &geometry) const;
 
     QSystemTrayIcon *tray_ = nullptr;
     ScreenshotOverlay *overlay_ = nullptr;
+    QVector<class PinnedShot *> pins_;
+    QPixmap lastCapture_;
 
 #ifdef Q_OS_WIN
     bool hotkeysRegistered_ = false;

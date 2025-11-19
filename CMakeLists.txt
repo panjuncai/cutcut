@@ -17,6 +17,8 @@ set(PROJECT_SOURCES
     src/appcontroller.cpp
     src/screenshotoverlay.h
     src/screenshotoverlay.cpp
+    src/pinnedshot.h
+    src/pinnedshot.cpp
 )
 
 add_executable(${PROJECT_NAME} ${PROJECT_SOURCES})

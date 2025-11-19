@@ -9,6 +9,9 @@ public:
     explicit ScreenshotOverlay(QWidget *parent = nullptr);
 
     void beginCapture(const QPixmap &screenPixmap, const QRect &virtualGeometry);
+    void dismiss();
+    bool hasSelection() const;
+    QPixmap currentSelectionPixmap() const;
 
 signals:
     void captureConfirmed(const QPixmap &pixmap);
@@ -32,4 +35,5 @@ private:
     QRect selectionRect_;
     QPoint selectionAnchor_;
     bool selecting_ = false;
+    bool selectionLocked_ = false;
 };
