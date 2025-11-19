@@ -58,6 +58,7 @@ AppController::AppController(QObject *parent)
     overlay_ = new ScreenshotOverlay;
     connect(overlay_, &ScreenshotOverlay::captureConfirmed, this, &AppController::onCaptureConfirmed);
     connect(overlay_, &ScreenshotOverlay::captureCanceled, this, &AppController::onCaptureCanceled);
+    connect(overlay_, &ScreenshotOverlay::pinRequested, this, &AppController::onPinRequested);
 }
 
 AppController::~AppController() {
@@ -115,6 +116,11 @@ void AppController::onCaptureConfirmed(const QPixmap &pixmap) {
 
 void AppController::onCaptureCanceled() {
     tray_->showMessage(tr("CutCut"), tr("Capture canceled."), QSystemTrayIcon::Information, 1500);
+}
+
+void AppController::onPinRequested(const QPixmap &pixmap) {
+    onCaptureConfirmed(pixmap);
+    pinCapture();
 }
 
 bool AppController::registerHotkeys() {

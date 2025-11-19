@@ -92,6 +92,13 @@ void ScreenshotOverlay::keyPressEvent(QKeyEvent *event) {
         cancelCaptureInternal();
         return;
     }
+    if (event->key() == Qt::Key_F3 && hasSelection()) {
+        QPixmap pix = currentSelectionPixmap();
+        if (!pix.isNull()) {
+            emit pinRequested(pix);
+        }
+        return;
+    }
     QWidget::keyPressEvent(event);
 }
 

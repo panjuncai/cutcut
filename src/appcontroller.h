@@ -24,6 +24,7 @@ public slots:
 private slots:
     void onCaptureConfirmed(const QPixmap &pixmap);
     void onCaptureCanceled();
+    void onPinRequested(const QPixmap &pixmap);
 
 private:
     enum HotkeyId { ScreenshotHotkey = 1, PinHotkey = 2 };

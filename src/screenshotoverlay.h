@@ -16,6 +16,7 @@ public:
 signals:
     void captureConfirmed(const QPixmap &pixmap);
     void captureCanceled();
+    void pinRequested(const QPixmap &pixmap);
 
 protected:
     void paintEvent(QPaintEvent *event) override;

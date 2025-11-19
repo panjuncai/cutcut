@@ -5,9 +5,10 @@
 
 PinnedShot::PinnedShot(const QPixmap &pixmap, QWidget *parent)
     : QWidget(parent), pixmap_(pixmap) {
-    setWindowFlags(Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint | Qt::Tool);
+    setWindowFlags(Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint | Qt::Window);
     setAttribute(Qt::WA_DeleteOnClose);
     setAttribute(Qt::WA_TranslucentBackground);
+    setAttribute(Qt::WA_ShowWithoutActivating);
     resize(pixmap_.size());
 }
 
