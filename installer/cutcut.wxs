@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <Product Id="*"
+           Name="CutCut"
+           Language="1033"
+           Version="1.0.0"
+           Manufacturer="CutCut"
+           UpgradeCode="5E40E4F1-5F2F-44F9-9D6D-970B0C1D13FA">
+    <Package InstallerVersion="500"
+             Compressed="yes"
+             InstallScope="perMachine"
+             Description="CutCut Screenshot Tool" />
+
+    <MajorUpgrade DowngradeErrorMessage="A newer version of CutCut is already installed."/>
+    <MediaTemplate EmbedCab="yes"/>
+
+    <Property Id="ARPPRODUCTICON" Value="CutCutIcon"/>
+    <Icon Id="CutCutIcon" SourceFile="cutcut.ico"/>
+
+    <Feature Id="MainFeature" Level="1">
+      <ComponentGroupRef Id="CutCutComponents" />
+    </Feature>
+
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="ProgramFiles64Folder">
+        <Directory Id="INSTALLDIR" Name="CutCut" />
+      </Directory>
+      <Directory Id="ProgramMenuFolder">
+        <Directory Id="CutCutShortcut" Name="CutCut" />
+      </Directory>
+    </Directory>
+
+    <DirectoryRef Id="CutCutShortcut">
+      <Component Id="ShortcutComponent" Guid="B7ADF28F-0B0E-4B5A-B6F6-D6C76F729B10">
+        <Shortcut Id="CutCutShortcut"
+                  Name="CutCut"
+                  Description="CutCut Screenshot Tool"
+                  Target="[#cutcut.exe]"
+                  WorkingDirectory="INSTALLDIR" />
+        <RemoveFolder Id="RemoveCutCutShortcut" On="uninstall" />
+        <RegistryValue Root="HKCU" Key="Software\CutCut" Name="installed" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+    </DirectoryRef>
+
+  </Product>
+</Wix>
