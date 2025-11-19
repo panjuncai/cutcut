@@ -19,6 +19,8 @@ set(PROJECT_SOURCES
     src/screenshotoverlay.cpp
     src/pinnedshot.h
     src/pinnedshot.cpp
+    src/selectiontoolbar.h
+    src/selectiontoolbar.cpp
 )
 
 add_executable(${PROJECT_NAME} ${PROJECT_SOURCES})

@@ -3,6 +3,8 @@
 #include <QPixmap>
 #include <QWidget>
 
+class SelectionToolbar;
+
 class ScreenshotOverlay : public QWidget {
     Q_OBJECT
 public:
@@ -30,6 +32,9 @@ private:
     QRect normalizedSelection() const;
     void finalizeSelection();
     void cancelCaptureInternal();
+    void showToolbar();
+    void hideToolbar();
+    void copySelection(bool pin);
 
     QPixmap screenPixmap_;
     QRect virtualGeometry_;
@@ -37,4 +42,5 @@ private:
     QPoint selectionAnchor_;
     bool selecting_ = false;
     bool selectionLocked_ = false;
+    SelectionToolbar *toolbar_ = nullptr;
 };

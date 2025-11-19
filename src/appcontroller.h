@@ -34,6 +34,7 @@ private:
     bool registerHotkeys();
     void unregisterHotkeys();
     void pinCapture();
+    void spawnPin(const QPixmap &pixmap);
     QRect virtualScreenGeometry() const;
     QPixmap captureVirtualScreen(const QRect &geometry) const;
 

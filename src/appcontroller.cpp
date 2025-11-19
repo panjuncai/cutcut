@@ -119,8 +119,7 @@ void AppController::onCaptureCanceled() {
 }
 
 void AppController::onPinRequested(const QPixmap &pixmap) {
-    onCaptureConfirmed(pixmap);
-    pinCapture();
+    spawnPin(pixmap);
 }
 
 bool AppController::registerHotkeys() {
@@ -219,7 +218,15 @@ void AppController::pinCapture() {
         tray_->showMessage(tr("CutCut"), tr("Take a screenshot first (F1)."), QSystemTrayIcon::Information, 2000);
         return;
     }
-    auto *pin = new PinnedShot(lastCapture_);
+    spawnPin(lastCapture_);
+}
+
+void AppController::spawnPin(const QPixmap &pixmap) {
+    if (pixmap.isNull()) {
+        return;
+    }
+    lastCapture_ = pixmap;
+    auto *pin = new PinnedShot(pixmap);
     pin->show();
     pins_.append(pin);
     connect(pin, &QObject::destroyed, this, [this, pin]() { pins_.removeOne(pin); });

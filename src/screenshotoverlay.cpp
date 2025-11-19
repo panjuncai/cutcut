@@ -1,5 +1,7 @@
 #include "screenshotoverlay.h"
 
+#include "selectiontoolbar.h"
+
 #include <QKeyEvent>
 #include <QMouseEvent>
 #include <QPainter>
@@ -14,6 +16,8 @@ ScreenshotOverlay::ScreenshotOverlay(QWidget *parent)
     setAttribute(Qt::WA_TranslucentBackground);
     setMouseTracking(true);
     setCursor(Qt::CrossCursor);
+    toolbar_ = new SelectionToolbar(this);
+    connect(toolbar_, &SelectionToolbar::copyClicked, this, [this]() { copySelection(false); });
     hide();
 }
 
@@ -24,6 +28,7 @@ void ScreenshotOverlay::beginCapture(const QPixmap &screenPixmap, const QRect &v
     selecting_ = false;
     selectionAnchor_ = QPoint();
     selectionLocked_ = false;
+    hideToolbar();
     setGeometry(virtualGeometry_);
     show();
     raise();
@@ -36,6 +41,7 @@ void ScreenshotOverlay::resetState() {
     selectionAnchor_ = QPoint();
     selectionLocked_ = false;
     screenPixmap_ = QPixmap();
+    hideToolbar();
     hide();
 }
 
@@ -59,6 +65,13 @@ void ScreenshotOverlay::paintEvent(QPaintEvent *) {
 
 void ScreenshotOverlay::mousePressEvent(QMouseEvent *event) {
     if (selectionLocked_) {
+        if (toolbar_ && toolbar_->isVisible() && toolbar_->geometry().contains(event->pos())) {
+            QWidget::mousePressEvent(event);
+            return;
+        }
+        if (event->button() == Qt::LeftButton && !selectionRect_.contains(event->pos())) {
+            cancelCaptureInternal();
+        }
         return;
     }
     if (event->button() != Qt::LeftButton) {
@@ -93,10 +106,7 @@ void ScreenshotOverlay::keyPressEvent(QKeyEvent *event) {
         return;
     }
     if (event->key() == Qt::Key_F3 && hasSelection()) {
-        QPixmap pix = currentSelectionPixmap();
-        if (!pix.isNull()) {
-            emit pinRequested(pix);
-        }
+        copySelection(true);
         return;
     }
     QWidget::keyPressEvent(event);
@@ -118,8 +128,7 @@ void ScreenshotOverlay::finalizeSelection() {
 
     selectionRect_ = area;
     selectionLocked_ = true;
-    QPixmap result = screenPixmap_.copy(area);
-    emit captureConfirmed(result);
+    showToolbar();
     update();
 }
 
@@ -141,4 +150,32 @@ QPixmap ScreenshotOverlay::currentSelectionPixmap() const {
         return {};
     }
     return screenPixmap_.copy(selectionRect_);
+}
+
+void ScreenshotOverlay::showToolbar() {
+    if (!toolbar_) {
+        return;
+    }
+    toolbar_->showForSelection(selectionRect_, rect());
+}
+
+void ScreenshotOverlay::hideToolbar() {
+    if (toolbar_) {
+        toolbar_->hide();
+    }
+}
+
+void ScreenshotOverlay::copySelection(bool pin) {
+    if (!hasSelection()) {
+        return;
+    }
+    QPixmap pix = currentSelectionPixmap();
+    if (pix.isNull()) {
+        return;
+    }
+    emit captureConfirmed(pix);
+    if (pin) {
+        emit pinRequested(pix);
+    }
+    dismiss();
 }
