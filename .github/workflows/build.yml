@@ -44,12 +44,27 @@ jobs:
           lipo -create build-arm64/cutcut build-x86/cutcut -output build-universal/cutcut
           chmod +x build-universal/cutcut
 
+      - name: Add entitlements file
+        run: |
+          cat <<'EOF' > cutcut.entitlements
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>com.apple.security.screen-recording</key>
+              <true/>
+              <key>com.apple.security.cs.disable-library-validation</key>
+              <true/>
+          </dict>
+          </plist>
+          EOF
+
       - name: Create app bundle
         run: |
           APP="dist/${{ env.APP_NAME }}.app"
           mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
           cp build-universal/cutcut "$APP/Contents/MacOS/${{ env.APP_NAME }}"
-          cat <<PLIST > "$APP/Contents/Info.plist"
+          cat <<'PLIST' > "$APP/Contents/Info.plist"
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
           <plist version="1.0">
@@ -57,7 +72,7 @@ jobs:
             <key>CFBundleDevelopmentRegion</key>
             <string>en</string>
             <key>CFBundleExecutable</key>
-            <string>${{ env.APP_NAME }}</string>
+            <string>__APP_NAME_PLACEHOLDER__</string>
             <key>CFBundleIdentifier</key>
             <string>com.cutcut.app</string>
             <key>CFBundleName</key>
@@ -71,9 +86,20 @@ jobs:
           </dict>
           </plist>
           PLIST
+          /usr/bin/sed -i '' "s/__APP_NAME_PLACEHOLDER__/${{ env.APP_NAME }}/g" "$APP/Contents/Info.plist"
+
+      - name: Deploy Qt frameworks
+        run: macdeployqt "dist/${{ env.APP_NAME }}.app"
+
+      - name: Codesign app bundle
+        run: |
+          codesign --deep --force --options runtime \
+            --entitlements cutcut.entitlements \
+            --sign - \
+            "dist/${{ env.APP_NAME }}.app"
 
       - name: Create DMG
-        run: macdeployqt "dist/${{ env.APP_NAME }}.app" -dmg
+        run: hdiutil create -volname "${{ env.APP_NAME }}" -srcfolder "dist/${{ env.APP_NAME }}.app" -ov -format UDZO "dist/${{ env.APP_NAME }}.dmg"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
