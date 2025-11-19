@@ -14,6 +14,7 @@ public:
     void dismiss();
     bool hasSelection() const;
     QPixmap currentSelectionPixmap() const;
+    bool copySelection(bool pin);
 
 signals:
     void captureConfirmed(const QPixmap &pixmap);
@@ -34,7 +35,6 @@ private:
     void cancelCaptureInternal();
     void showToolbar();
     void hideToolbar();
-    void copySelection(bool pin);
 
     QPixmap screenPixmap_;
     QRect virtualGeometry_;

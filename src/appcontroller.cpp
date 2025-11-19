@@ -80,7 +80,7 @@ void AppController::setupTray() {
 
     auto *menu = new QMenu;
     QAction *captureAction = menu->addAction(tr("Capture (F1)"));
-    QAction *pinAction = menu->addAction(tr("Pin last (F3)"));
+    QAction *pinAction = menu->addAction(tr("Pin (F3)"));
     menu->addSeparator();
     QAction *quitAction = menu->addAction(tr("Quit"));
 
@@ -214,6 +214,9 @@ void AppController::handleHotkey(int hotkeyId) {
 }
 
 void AppController::pinCapture() {
+    if (overlay_->hasSelection() && overlay_->copySelection(true)) {
+        return;
+    }
     if (lastCapture_.isNull()) {
         tray_->showMessage(tr("CutCut"), tr("Take a screenshot first (F1)."), QSystemTrayIcon::Information, 2000);
         return;

@@ -13,7 +13,9 @@ public:
 
 signals:
     void copyClicked();
+    void pinClicked();
 
 private:
     QToolButton *copyButton_ = nullptr;
+    QToolButton *pinButton_ = nullptr;
 };

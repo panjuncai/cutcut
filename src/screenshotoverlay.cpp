@@ -18,6 +18,7 @@ ScreenshotOverlay::ScreenshotOverlay(QWidget *parent)
     setCursor(Qt::CrossCursor);
     toolbar_ = new SelectionToolbar(this);
     connect(toolbar_, &SelectionToolbar::copyClicked, this, [this]() { copySelection(false); });
+    connect(toolbar_, &SelectionToolbar::pinClicked, this, [this]() { copySelection(true); });
     hide();
 }
 
@@ -165,17 +166,18 @@ void ScreenshotOverlay::hideToolbar() {
     }
 }
 
-void ScreenshotOverlay::copySelection(bool pin) {
+bool ScreenshotOverlay::copySelection(bool pin) {
     if (!hasSelection()) {
-        return;
+        return false;
     }
     QPixmap pix = currentSelectionPixmap();
     if (pix.isNull()) {
-        return;
+        return false;
     }
     emit captureConfirmed(pix);
     if (pin) {
         emit pinRequested(pix);
     }
     dismiss();
+    return true;
 }
