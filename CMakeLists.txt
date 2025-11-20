@@ -30,3 +30,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE Qt${QT_VERSION_MAJOR}::Widgets Qt$
 if(APPLE)
     target_link_libraries(${PROJECT_NAME} PRIVATE "-framework Carbon")
 endif()
+
+if(WIN32)
+    set_target_properties(${PROJECT_NAME} PROPERTIES WIN32_EXECUTABLE TRUE)
+endif()

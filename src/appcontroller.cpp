@@ -9,6 +9,7 @@
 #include <QMenu>
 #include <QPainter>
 #include <QScreen>
+#include <algorithm>
 
 #ifdef Q_OS_WIN
 #include <windows.h>
@@ -255,14 +256,25 @@ QPixmap AppController::captureVirtualScreen(const QRect &geometry) const {
         return {};
     }
 
-    QPixmap canvas(geometry.size());
+    const auto screens = QGuiApplication::screens();
+    qreal maxDpr = 1.0;
+    for (QScreen *screen : screens) {
+        maxDpr = std::max(maxDpr, screen->devicePixelRatio());
+    }
+
+    QSize scaledSize = geometry.size();
+    scaledSize.setWidth(int(scaledSize.width() * maxDpr));
+    scaledSize.setHeight(int(scaledSize.height() * maxDpr));
+    QPixmap canvas(scaledSize);
+    canvas.setDevicePixelRatio(maxDpr);
     canvas.fill(Qt::transparent);
+
     QPainter painter(&canvas);
-    for (QScreen *screen : QGuiApplication::screens()) {
+    painter.scale(maxDpr, maxDpr);
+    for (QScreen *screen : screens) {
         const QRect screenRect = screen->geometry();
         const QPoint targetPos = screenRect.topLeft() - geometry.topLeft();
         painter.drawPixmap(targetPos, screen->grabWindow(0));
     }
-    painter.end();
     return canvas;
 }
