@@ -41,6 +41,7 @@ void ScreenshotOverlay::resetState() {
     selecting_ = false;
     selectionAnchor_ = QPoint();
     selectionLocked_ = false;
+    selectionPixmap_ = QPixmap();
     screenPixmap_ = QPixmap();
     hideToolbar();
     hide();

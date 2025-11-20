@@ -44,5 +44,6 @@ private:
     QPoint selectionAnchor_;
     bool selecting_ = false;
     bool selectionLocked_ = false;
+    QPixmap selectionPixmap_;
     SelectionToolbar *toolbar_ = nullptr;
 };
