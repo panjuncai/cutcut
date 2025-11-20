@@ -35,6 +35,8 @@ private:
     void cancelCaptureInternal();
     void showToolbar();
     void hideToolbar();
+    QRect physicalSelectionRect() const;
+    QPixmap composeSelectionPixmap() const;
 
     QPixmap screenPixmap_;
     QRect virtualGeometry_;

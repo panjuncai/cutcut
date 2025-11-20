@@ -58,7 +58,9 @@ void ScreenshotOverlay::paintEvent(QPaintEvent *) {
 
     const QRect selection = normalizedSelection();
     if (!selection.isNull()) {
-        painter.drawPixmap(selection.topLeft(), screenPixmap_.copy(selection));
+        QRect physical = physicalSelectionRect();
+        QPixmap scaled = screenPixmap_.copy(physical).scaled(selection.size(), Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+        painter.drawPixmap(selection.topLeft(), scaled);
         painter.setPen(QPen(Qt::white, 1));
         painter.drawRect(selection.adjusted(0, 0, -1, -1));
     }
@@ -129,6 +131,7 @@ void ScreenshotOverlay::finalizeSelection() {
 
     selectionRect_ = area;
     selectionLocked_ = true;
+    selectionPixmap_ = composeSelectionPixmap();
     showToolbar();
     update();
 }
@@ -150,7 +153,7 @@ QPixmap ScreenshotOverlay::currentSelectionPixmap() const {
     if (!hasSelection()) {
         return {};
     }
-    return screenPixmap_.copy(selectionRect_);
+    return composeSelectionPixmap();
 }
 
 void ScreenshotOverlay::showToolbar() {
@@ -180,4 +183,31 @@ bool ScreenshotOverlay::copySelection(bool pin) {
     }
     dismiss();
     return true;
+}
+QRect ScreenshotOverlay::physicalSelectionRect() const {
+    if (selectionRect_.isNull() || screenPixmap_.isNull()) {
+        return QRect();
+    }
+    const qreal ratio = screenPixmap_.devicePixelRatio();
+    QRectF logical(selectionRect_);
+    QRect result = QRect(
+        int(std::round(logical.left() * ratio)),
+        int(std::round(logical.top() * ratio)),
+        int(std::round(logical.width() * ratio)),
+        int(std::round(logical.height() * ratio)));
+    result &= QRect(QPoint(0, 0), screenPixmap_.size() * ratio);
+    return result;
+}
+
+QPixmap ScreenshotOverlay::composeSelectionPixmap() const {
+    if (selectionRect_.isNull() || screenPixmap_.isNull()) {
+        return {};
+    }
+    QRect physical = physicalSelectionRect();
+    if (physical.isNull()) {
+        return {};
+    }
+    QPixmap copy = screenPixmap_.copy(physical);
+    copy.setDevicePixelRatio(screenPixmap_.devicePixelRatio());
+    return copy;
 }
