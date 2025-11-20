@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 env:
-  QT_VERSION: '6.6.1'
+  QT_VERSION: '6.5.3'
   APP_NAME: 'CutCut'
 
 jobs:
@@ -27,13 +27,13 @@ jobs:
           cache: true
 
       - name: Configure arm64
-        run: cmake -S . -B build-arm64 -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=arm64
+        run: cmake -S . -B build-arm64 -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0
 
       - name: Build arm64
         run: cmake --build build-arm64 --config Release
 
       - name: Configure x86_64
-        run: cmake -S . -B build-x86 -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=x86_64
+        run: cmake -S . -B build-x86 -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=x86_64 -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0
 
       - name: Build x86_64
         run: cmake --build build-x86 --config Release
