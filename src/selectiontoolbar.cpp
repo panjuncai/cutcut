@@ -79,6 +79,16 @@ QIcon makeRectangleIcon() {
     return makeSvgIcon(kRectangleSvg, QSize(kIconSize, kIconSize));
 }
 
+QIcon makeUndoIcon() {
+    constexpr auto kUndoSvg = R"svg(
+<svg width="22" height="22" viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path d="M8.5 12.8L4 8.3L8.5 3.8" stroke="#374151" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M4 8.3H13.7A4.95 4.95 0 0 1 18.65 13.25A4.95 4.95 0 0 1 13.7 18.2H10.6" stroke="#374151" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
+)svg";
+    return makeSvgIcon(kUndoSvg, QSize(kIconSize, kIconSize));
+}
+
 QIcon makeCloseIcon() {
     constexpr auto kCloseSvg = R"svg(
 <svg width="22" height="22" viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -150,21 +160,25 @@ SelectionToolbar::SelectionToolbar(QWidget *parent)
     auto *grip = new GripHandle(this);
 
     rectangleButton_ = makeIconButton(makeRectangleIcon(), tr("Rectangle"));
+    undoButton_ = makeIconButton(makeUndoIcon(), tr("Undo"));
     pinButton_ = makeIconButton(makePinIcon(), tr("Pin"));
     copyButton_ = makeIconButton(makeCheckIcon(), tr("Copy"));
     closeButton_ = makeIconButton(makeCloseIcon(), tr("Cancel"));
     rectangleButton_->setCheckable(true);
+    undoButton_->setEnabled(false);
 
     layout->addWidget(grip);
     layout->addSpacing(3);
     layout->addWidget(makeDivider());
     layout->addSpacing(3);
     layout->addWidget(rectangleButton_);
+    layout->addWidget(undoButton_);
     layout->addWidget(pinButton_);
     layout->addWidget(closeButton_);
     layout->addWidget(copyButton_);
 
     connect(rectangleButton_, &QToolButton::clicked, this, &SelectionToolbar::rectangleClicked);
+    connect(undoButton_, &QToolButton::clicked, this, &SelectionToolbar::undoClicked);
     connect(copyButton_, &QToolButton::clicked, this, &SelectionToolbar::copyClicked);
     connect(pinButton_, &QToolButton::clicked, this, &SelectionToolbar::pinClicked);
     connect(closeButton_, &QToolButton::clicked, this, &SelectionToolbar::closeClicked);
@@ -198,6 +212,27 @@ void SelectionToolbar::setRectangleMode(bool enabled) {
                                           "QToolButton:pressed {"
                                           "background: rgba(27, 31, 38, 0.14);"
                                           "}");
+}
+
+void SelectionToolbar::setUndoEnabled(bool enabled) {
+    if (!undoButton_) {
+        return;
+    }
+    undoButton_->setEnabled(enabled);
+    undoButton_->setStyleSheet("QToolButton {"
+                               "background: transparent;"
+                               "border: none;"
+                               "border-radius: 8px;"
+                               "}"
+                               "QToolButton:hover:enabled {"
+                               "background: rgba(27, 31, 38, 0.08);"
+                               "}"
+                               "QToolButton:pressed:enabled {"
+                               "background: rgba(27, 31, 38, 0.14);"
+                               "}"
+                               "QToolButton:disabled {"
+                               "color: rgba(55, 65, 81, 0.38);"
+                               "}");
 }
 
 void SelectionToolbar::paintEvent(QPaintEvent *event) {

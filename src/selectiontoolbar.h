@@ -12,9 +12,11 @@ public:
 
     void showForSelection(const QRect &selection, const QRect &overlayRect);
     void setRectangleMode(bool enabled);
+    void setUndoEnabled(bool enabled);
 
 signals:
     void rectangleClicked();
+    void undoClicked();
     void copyClicked();
     void pinClicked();
     void closeClicked();
@@ -32,6 +34,7 @@ private:
     bool dragging_ = false;
     QPoint dragOffset_;
     QToolButton *rectangleButton_ = nullptr;
+    QToolButton *undoButton_ = nullptr;
     QToolButton *copyButton_ = nullptr;
     QToolButton *pinButton_ = nullptr;
     QToolButton *closeButton_ = nullptr;

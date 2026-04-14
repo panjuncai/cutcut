@@ -56,6 +56,7 @@ private:
     void updateCursor(const QPoint &pos);
     void toggleRectangleMode();
     void setRectangleMode(bool enabled);
+    void undoLastAnnotation();
     QRect normalizedAnnotationRect() const;
     void drawAnnotationRectangles(QPainter &painter) const;
     QPixmap renderedSelectionPixmap() const;

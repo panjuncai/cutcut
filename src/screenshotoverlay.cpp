@@ -23,6 +23,7 @@ ScreenshotOverlay::ScreenshotOverlay(QWidget *parent)
     setCursor(Qt::CrossCursor);
     toolbar_ = new SelectionToolbar(this);
     connect(toolbar_, &SelectionToolbar::rectangleClicked, this, &ScreenshotOverlay::toggleRectangleMode);
+    connect(toolbar_, &SelectionToolbar::undoClicked, this, &ScreenshotOverlay::undoLastAnnotation);
     connect(toolbar_, &SelectionToolbar::copyClicked, this, [this]() { copySelection(false); });
     connect(toolbar_, &SelectionToolbar::pinClicked, this, [this]() { copySelection(true); });
     connect(toolbar_, &SelectionToolbar::closeClicked, this, &ScreenshotOverlay::cancelCaptureInternal);
@@ -49,6 +50,9 @@ void ScreenshotOverlay::beginCapture(const QPixmap &screenPixmap, const QRect &v
     hideToolbar();
     setGeometry(virtualGeometry_);
     setCursor(Qt::CrossCursor);
+    if (toolbar_) {
+        toolbar_->setUndoEnabled(false);
+    }
     show();
     raise();
     activateWindow();
@@ -174,6 +178,9 @@ void ScreenshotOverlay::mouseReleaseEvent(QMouseEvent *event) {
         const QRect rect = normalizedAnnotationRect();
         if (!rect.isNull() && rect.width() >= kMinAnnotationSize && rect.height() >= kMinAnnotationSize) {
             annotationRects_.append(rect.translated(-selectionRect_.topLeft()));
+            if (toolbar_) {
+                toolbar_->setUndoEnabled(true);
+            }
         }
         annotationRect_ = QRect();
         update();
@@ -423,6 +430,7 @@ void ScreenshotOverlay::showToolbar() {
         return;
     }
     toolbar_->setRectangleMode(rectangleMode_);
+    toolbar_->setUndoEnabled(!annotationRects_.isEmpty());
     toolbar_->showForSelection(selectionRect_, rect());
 }
 
@@ -460,6 +468,17 @@ void ScreenshotOverlay::setRectangleMode(bool enabled) {
         toolbar_->setRectangleMode(enabled);
     }
     setCursor(enabled ? Qt::CrossCursor : Qt::SizeAllCursor);
+    update();
+}
+
+void ScreenshotOverlay::undoLastAnnotation() {
+    if (annotationRects_.isEmpty()) {
+        return;
+    }
+    annotationRects_.removeLast();
+    if (toolbar_) {
+        toolbar_->setUndoEnabled(!annotationRects_.isEmpty());
+    }
     update();
 }
 
