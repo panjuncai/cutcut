@@ -11,8 +11,10 @@ public:
     explicit SelectionToolbar(QWidget *parent = nullptr);
 
     void showForSelection(const QRect &selection, const QRect &overlayRect);
+    void setRectangleMode(bool enabled);
 
 signals:
+    void rectangleClicked();
     void copyClicked();
     void pinClicked();
     void closeClicked();
@@ -29,6 +31,7 @@ private:
     QRect overlayRect_;
     bool dragging_ = false;
     QPoint dragOffset_;
+    QToolButton *rectangleButton_ = nullptr;
     QToolButton *copyButton_ = nullptr;
     QToolButton *pinButton_ = nullptr;
     QToolButton *closeButton_ = nullptr;

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QPixmap>
+#include <QVector>
 #include <QWidget>
 
 class SelectionToolbar;
@@ -53,15 +54,25 @@ private:
     DragMode dragModeForPosition(const QPoint &pos) const;
     Qt::CursorShape cursorForDragMode(DragMode mode) const;
     void updateCursor(const QPoint &pos);
+    void toggleRectangleMode();
+    void setRectangleMode(bool enabled);
+    QRect normalizedAnnotationRect() const;
+    void drawAnnotationRectangles(QPainter &painter) const;
+    QPixmap renderedSelectionPixmap() const;
 
     QPixmap screenPixmap_;
     QRect virtualGeometry_;
     QRect selectionRect_;
+    QRect annotationRect_;
     QPoint selectionAnchor_;
     QPoint dragOffset_;
     QPoint resizeAnchor_;
+    QPoint annotationAnchor_;
     QRect dragStartRect_;
+    QVector<QRect> annotationRects_;
     bool selecting_ = false;
+    bool drawingAnnotation_ = false;
+    bool rectangleMode_ = false;
     bool draggingSelection_ = false;
     bool selectionLocked_ = false;
     DragMode dragMode_ = DragMode::None;

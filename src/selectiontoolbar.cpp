@@ -70,6 +70,15 @@ QIcon makePinIcon() {
     return makeSvgIcon(kPinSvg, QSize(kIconSize, kIconSize));
 }
 
+QIcon makeRectangleIcon() {
+    constexpr auto kRectangleSvg = R"svg(
+<svg width="22" height="22" viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect x="2.7" y="5.7" width="16.6" height="10.6" rx="1.8" stroke="#374151" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
+)svg";
+    return makeSvgIcon(kRectangleSvg, QSize(kIconSize, kIconSize));
+}
+
 QIcon makeCloseIcon() {
     constexpr auto kCloseSvg = R"svg(
 <svg width="22" height="22" viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -140,21 +149,55 @@ SelectionToolbar::SelectionToolbar(QWidget *parent)
 
     auto *grip = new GripHandle(this);
 
+    rectangleButton_ = makeIconButton(makeRectangleIcon(), tr("Rectangle"));
     pinButton_ = makeIconButton(makePinIcon(), tr("Pin"));
     copyButton_ = makeIconButton(makeCheckIcon(), tr("Copy"));
     closeButton_ = makeIconButton(makeCloseIcon(), tr("Cancel"));
+    rectangleButton_->setCheckable(true);
 
     layout->addWidget(grip);
     layout->addSpacing(3);
     layout->addWidget(makeDivider());
     layout->addSpacing(3);
+    layout->addWidget(rectangleButton_);
     layout->addWidget(pinButton_);
     layout->addWidget(closeButton_);
     layout->addWidget(copyButton_);
 
+    connect(rectangleButton_, &QToolButton::clicked, this, &SelectionToolbar::rectangleClicked);
     connect(copyButton_, &QToolButton::clicked, this, &SelectionToolbar::copyClicked);
     connect(pinButton_, &QToolButton::clicked, this, &SelectionToolbar::pinClicked);
     connect(closeButton_, &QToolButton::clicked, this, &SelectionToolbar::closeClicked);
+}
+
+void SelectionToolbar::setRectangleMode(bool enabled) {
+    if (!rectangleButton_) {
+        return;
+    }
+    rectangleButton_->setChecked(enabled);
+    rectangleButton_->setStyleSheet(enabled
+                                        ? "QToolButton {"
+                                          "background: rgba(220, 38, 38, 0.12);"
+                                          "border: none;"
+                                          "border-radius: 8px;"
+                                          "}"
+                                          "QToolButton:hover {"
+                                          "background: rgba(220, 38, 38, 0.16);"
+                                          "}"
+                                          "QToolButton:pressed {"
+                                          "background: rgba(220, 38, 38, 0.22);"
+                                          "}"
+                                        : "QToolButton {"
+                                          "background: transparent;"
+                                          "border: none;"
+                                          "border-radius: 8px;"
+                                          "}"
+                                          "QToolButton:hover {"
+                                          "background: rgba(27, 31, 38, 0.08);"
+                                          "}"
+                                          "QToolButton:pressed {"
+                                          "background: rgba(27, 31, 38, 0.14);"
+                                          "}");
 }
 
 void SelectionToolbar::paintEvent(QPaintEvent *event) {

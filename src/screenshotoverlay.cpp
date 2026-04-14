@@ -12,6 +12,7 @@ namespace {
 constexpr QColor kShadeColor(0, 0, 0, 140);
 constexpr int kResizeMargin = 8;
 constexpr int kMinSelectionSize = 5;
+constexpr int kMinAnnotationSize = 6;
 }
 
 ScreenshotOverlay::ScreenshotOverlay(QWidget *parent)
@@ -21,6 +22,7 @@ ScreenshotOverlay::ScreenshotOverlay(QWidget *parent)
     setMouseTracking(true);
     setCursor(Qt::CrossCursor);
     toolbar_ = new SelectionToolbar(this);
+    connect(toolbar_, &SelectionToolbar::rectangleClicked, this, &ScreenshotOverlay::toggleRectangleMode);
     connect(toolbar_, &SelectionToolbar::copyClicked, this, [this]() { copySelection(false); });
     connect(toolbar_, &SelectionToolbar::pinClicked, this, [this]() { copySelection(true); });
     connect(toolbar_, &SelectionToolbar::closeClicked, this, &ScreenshotOverlay::cancelCaptureInternal);
@@ -31,12 +33,17 @@ void ScreenshotOverlay::beginCapture(const QPixmap &screenPixmap, const QRect &v
     screenPixmap_ = screenPixmap;
     virtualGeometry_ = virtualGeometry;
     selectionRect_ = QRect();
+    annotationRect_ = QRect();
     selecting_ = false;
+    drawingAnnotation_ = false;
+    rectangleMode_ = false;
     draggingSelection_ = false;
     selectionAnchor_ = QPoint();
     dragOffset_ = QPoint();
     resizeAnchor_ = QPoint();
+    annotationAnchor_ = QPoint();
     dragStartRect_ = QRect();
+    annotationRects_.clear();
     selectionLocked_ = false;
     dragMode_ = DragMode::None;
     hideToolbar();
@@ -49,12 +56,17 @@ void ScreenshotOverlay::beginCapture(const QPixmap &screenPixmap, const QRect &v
 
 void ScreenshotOverlay::resetState() {
     selectionRect_ = QRect();
+    annotationRect_ = QRect();
     selecting_ = false;
+    drawingAnnotation_ = false;
+    rectangleMode_ = false;
     draggingSelection_ = false;
     selectionAnchor_ = QPoint();
     dragOffset_ = QPoint();
     resizeAnchor_ = QPoint();
+    annotationAnchor_ = QPoint();
     dragStartRect_ = QRect();
+    annotationRects_.clear();
     selectionLocked_ = false;
     dragMode_ = DragMode::None;
     screenPixmap_ = QPixmap();
@@ -78,6 +90,7 @@ void ScreenshotOverlay::paintEvent(QPaintEvent *) {
         painter.drawPixmap(selection.topLeft(), screenPixmap_.copy(selection));
         painter.setPen(QPen(Qt::white, 1));
         painter.drawRect(selection.adjusted(0, 0, -1, -1));
+        drawAnnotationRectangles(painter);
     }
 }
 
@@ -88,6 +101,16 @@ void ScreenshotOverlay::mousePressEvent(QMouseEvent *event) {
             return;
         }
         if (event->button() != Qt::LeftButton) {
+            return;
+        }
+        if (rectangleMode_) {
+            if (!selectionRect_.contains(event->pos())) {
+                return;
+            }
+            drawingAnnotation_ = true;
+            annotationAnchor_ = event->pos();
+            annotationRect_ = QRect(annotationAnchor_, annotationAnchor_);
+            update();
             return;
         }
         dragMode_ = dragModeForPosition(event->pos());
@@ -114,6 +137,14 @@ void ScreenshotOverlay::mousePressEvent(QMouseEvent *event) {
 }
 
 void ScreenshotOverlay::mouseMoveEvent(QMouseEvent *event) {
+    if (drawingAnnotation_) {
+        QPoint currentPos = event->pos();
+        currentPos.setX(std::clamp(currentPos.x(), selectionRect_.left(), selectionRect_.right()));
+        currentPos.setY(std::clamp(currentPos.y(), selectionRect_.top(), selectionRect_.bottom()));
+        annotationRect_ = QRect(annotationAnchor_, currentPos).normalized();
+        update();
+        return;
+    }
     if (draggingSelection_) {
         if (dragMode_ == DragMode::Move) {
             selectionRect_ = clampedSelection(event->pos() - dragOffset_);
@@ -138,6 +169,16 @@ void ScreenshotOverlay::mouseReleaseEvent(QMouseEvent *event) {
     if (event->button() != Qt::LeftButton) {
         return;
     }
+    if (drawingAnnotation_) {
+        drawingAnnotation_ = false;
+        const QRect rect = normalizedAnnotationRect();
+        if (!rect.isNull() && rect.width() >= kMinAnnotationSize && rect.height() >= kMinAnnotationSize) {
+            annotationRects_.append(rect.translated(-selectionRect_.topLeft()));
+        }
+        annotationRect_ = QRect();
+        update();
+        return;
+    }
     if (draggingSelection_) {
         draggingSelection_ = false;
         dragMode_ = DragMode::None;
@@ -156,6 +197,16 @@ void ScreenshotOverlay::mouseReleaseEvent(QMouseEvent *event) {
 
 void ScreenshotOverlay::keyPressEvent(QKeyEvent *event) {
     if (event->key() == Qt::Key_Escape) {
+        if (drawingAnnotation_) {
+            drawingAnnotation_ = false;
+            annotationRect_ = QRect();
+            update();
+            return;
+        }
+        if (rectangleMode_) {
+            setRectangleMode(false);
+            return;
+        }
         cancelCaptureInternal();
         return;
     }
@@ -183,6 +234,13 @@ QRect ScreenshotOverlay::clampedSelection(const QPoint &topLeft) const {
     const int clampedX = std::clamp(topLeft.x(), 0, maxX);
     const int clampedY = std::clamp(topLeft.y(), 0, maxY);
     return QRect(QPoint(clampedX, clampedY), selectionRect_.size());
+}
+
+QRect ScreenshotOverlay::normalizedAnnotationRect() const {
+    if (annotationRect_.isNull()) {
+        return {};
+    }
+    return annotationRect_.normalized().intersected(selectionRect_);
 }
 
 QRect ScreenshotOverlay::resizedSelection(const QPoint &pos) const {
@@ -317,6 +375,10 @@ Qt::CursorShape ScreenshotOverlay::cursorForDragMode(DragMode mode) const {
 }
 
 void ScreenshotOverlay::updateCursor(const QPoint &pos) {
+    if (rectangleMode_) {
+        setCursor(selectionRect_.contains(pos) ? Qt::CrossCursor : Qt::ArrowCursor);
+        return;
+    }
     setCursor(cursorForDragMode(dragModeForPosition(pos)));
 }
 
@@ -329,6 +391,8 @@ void ScreenshotOverlay::finalizeSelection() {
 
     selectionRect_ = area;
     selectionLocked_ = true;
+    annotationRects_.clear();
+    annotationRect_ = QRect();
     setCursor(Qt::SizeAllCursor);
     showToolbar();
     update();
@@ -351,13 +415,14 @@ QPixmap ScreenshotOverlay::currentSelectionPixmap() const {
     if (!hasSelection()) {
         return {};
     }
-    return screenPixmap_.copy(selectionRect_);
+    return renderedSelectionPixmap();
 }
 
 void ScreenshotOverlay::showToolbar() {
     if (!toolbar_) {
         return;
     }
+    toolbar_->setRectangleMode(rectangleMode_);
     toolbar_->showForSelection(selectionRect_, rect());
 }
 
@@ -381,4 +446,59 @@ bool ScreenshotOverlay::copySelection(bool pin) {
     }
     dismiss();
     return true;
+}
+
+void ScreenshotOverlay::toggleRectangleMode() {
+    setRectangleMode(!rectangleMode_);
+}
+
+void ScreenshotOverlay::setRectangleMode(bool enabled) {
+    rectangleMode_ = enabled;
+    drawingAnnotation_ = false;
+    annotationRect_ = QRect();
+    if (toolbar_) {
+        toolbar_->setRectangleMode(enabled);
+    }
+    setCursor(enabled ? Qt::CrossCursor : Qt::SizeAllCursor);
+    update();
+}
+
+void ScreenshotOverlay::drawAnnotationRectangles(QPainter &painter) const {
+    auto drawRect = [&painter](const QRect &rect) {
+        if (rect.isNull()) {
+            return;
+        }
+        painter.save();
+        painter.setRenderHint(QPainter::Antialiasing, true);
+        painter.setBrush(Qt::NoBrush);
+        painter.setPen(QPen(QColor(239, 68, 68, 70), 4.0, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+        painter.drawRoundedRect(rect.adjusted(1, 1, -1, -1), 6, 6);
+        painter.setPen(QPen(QColor(220, 38, 38, 230), 2.0, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+        painter.drawRoundedRect(rect.adjusted(1, 1, -1, -1), 6, 6);
+        painter.restore();
+    };
+
+    for (const QRect &rect : annotationRects_) {
+        drawRect(rect.translated(selectionRect_.topLeft()));
+    }
+    drawRect(normalizedAnnotationRect());
+}
+
+QPixmap ScreenshotOverlay::renderedSelectionPixmap() const {
+    QPixmap pixmap = screenPixmap_.copy(selectionRect_);
+    if (pixmap.isNull() || annotationRects_.isEmpty()) {
+        return pixmap;
+    }
+
+    QPainter painter(&pixmap);
+    painter.setRenderHint(QPainter::Antialiasing, true);
+    for (const QRect &rect : annotationRects_) {
+        painter.setBrush(Qt::NoBrush);
+        painter.setPen(QPen(QColor(239, 68, 68, 70), 4.0, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+        painter.drawRoundedRect(rect.adjusted(1, 1, -1, -1), 6, 6);
+        painter.setPen(QPen(QColor(220, 38, 38, 230), 2.0, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+        painter.drawRoundedRect(rect.adjusted(1, 1, -1, -1), 6, 6);
+    }
+    painter.end();
+    return pixmap;
 }
