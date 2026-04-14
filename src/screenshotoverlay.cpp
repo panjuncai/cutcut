@@ -2,9 +2,12 @@
 
 #include "selectiontoolbar.h"
 
+#include <QFontMetrics>
 #include <QKeyEvent>
+#include <QLineEdit>
 #include <QMouseEvent>
 #include <QPainter>
+#include <QPalette>
 #include <algorithm>
 #include <cstdlib>
 
@@ -21,12 +24,27 @@ ScreenshotOverlay::ScreenshotOverlay(QWidget *parent)
     setAttribute(Qt::WA_TranslucentBackground);
     setMouseTracking(true);
     setCursor(Qt::CrossCursor);
+    textEditor_ = new QLineEdit(this);
+    textEditor_->hide();
+    textEditor_->setFrame(false);
+    textEditor_->setAttribute(Qt::WA_ShowWithoutActivating);
+    textEditor_->setAttribute(Qt::WA_TranslucentBackground);
+    textEditor_->setStyleSheet("QLineEdit {"
+                               "background: transparent;"
+                               "border: none;"
+                               "padding: 0;"
+                               "selection-background-color: rgba(59, 130, 246, 0.22);"
+                               "}");
+    connect(textEditor_, &QLineEdit::editingFinished, this, &ScreenshotOverlay::commitTextInput);
     toolbar_ = new SelectionToolbar(this);
     connect(toolbar_, &SelectionToolbar::rectangleClicked, this, &ScreenshotOverlay::toggleRectangleMode);
+    connect(toolbar_, &SelectionToolbar::textClicked, this, &ScreenshotOverlay::toggleTextMode);
     connect(toolbar_, &SelectionToolbar::undoClicked, this, &ScreenshotOverlay::undoLastAnnotation);
     connect(toolbar_, &SelectionToolbar::copyClicked, this, [this]() { copySelection(false); });
     connect(toolbar_, &SelectionToolbar::pinClicked, this, [this]() { copySelection(true); });
     connect(toolbar_, &SelectionToolbar::closeClicked, this, &ScreenshotOverlay::cancelCaptureInternal);
+    connect(toolbar_, &SelectionToolbar::textSizeChanged, this, [this](int size) { currentTextSize_ = size; });
+    connect(toolbar_, &SelectionToolbar::textColorChanged, this, [this](const QColor &color) { currentTextColor_ = color; });
     hide();
 }
 
@@ -38,6 +56,7 @@ void ScreenshotOverlay::beginCapture(const QPixmap &screenPixmap, const QRect &v
     selecting_ = false;
     drawingAnnotation_ = false;
     rectangleMode_ = false;
+    textMode_ = false;
     draggingSelection_ = false;
     selectionAnchor_ = QPoint();
     dragOffset_ = QPoint();
@@ -45,6 +64,8 @@ void ScreenshotOverlay::beginCapture(const QPixmap &screenPixmap, const QRect &v
     annotationAnchor_ = QPoint();
     dragStartRect_ = QRect();
     annotationRects_.clear();
+    textAnnotations_.clear();
+    annotationHistory_.clear();
     selectionLocked_ = false;
     dragMode_ = DragMode::None;
     hideToolbar();
@@ -52,7 +73,12 @@ void ScreenshotOverlay::beginCapture(const QPixmap &screenPixmap, const QRect &v
     setCursor(Qt::CrossCursor);
     if (toolbar_) {
         toolbar_->setUndoEnabled(false);
+        toolbar_->setRectangleMode(false);
+        toolbar_->setTextMode(false);
+        toolbar_->setCurrentTextSize(currentTextSize_);
+        toolbar_->setCurrentTextColor(currentTextColor_);
     }
+    cancelTextInput();
     show();
     raise();
     activateWindow();
@@ -64,6 +90,7 @@ void ScreenshotOverlay::resetState() {
     selecting_ = false;
     drawingAnnotation_ = false;
     rectangleMode_ = false;
+    textMode_ = false;
     draggingSelection_ = false;
     selectionAnchor_ = QPoint();
     dragOffset_ = QPoint();
@@ -71,10 +98,13 @@ void ScreenshotOverlay::resetState() {
     annotationAnchor_ = QPoint();
     dragStartRect_ = QRect();
     annotationRects_.clear();
+    textAnnotations_.clear();
+    annotationHistory_.clear();
     selectionLocked_ = false;
     dragMode_ = DragMode::None;
     screenPixmap_ = QPixmap();
     hideToolbar();
+    cancelTextInput();
     setCursor(Qt::CrossCursor);
     hide();
 }
@@ -95,6 +125,7 @@ void ScreenshotOverlay::paintEvent(QPaintEvent *) {
         painter.setPen(QPen(Qt::white, 1));
         painter.drawRect(selection.adjusted(0, 0, -1, -1));
         drawAnnotationRectangles(painter);
+        drawTextAnnotations(painter);
     }
 }
 
@@ -105,6 +136,13 @@ void ScreenshotOverlay::mousePressEvent(QMouseEvent *event) {
             return;
         }
         if (event->button() != Qt::LeftButton) {
+            return;
+        }
+        if (textMode_) {
+            if (!selectionRect_.contains(event->pos())) {
+                return;
+            }
+            beginTextInput(event->pos());
             return;
         }
         if (rectangleMode_) {
@@ -178,6 +216,7 @@ void ScreenshotOverlay::mouseReleaseEvent(QMouseEvent *event) {
         const QRect rect = normalizedAnnotationRect();
         if (!rect.isNull() && rect.width() >= kMinAnnotationSize && rect.height() >= kMinAnnotationSize) {
             annotationRects_.append(rect.translated(-selectionRect_.topLeft()));
+            annotationHistory_.append(AnnotationKind::Rectangle);
             if (toolbar_) {
                 toolbar_->setUndoEnabled(true);
             }
@@ -208,6 +247,14 @@ void ScreenshotOverlay::keyPressEvent(QKeyEvent *event) {
             drawingAnnotation_ = false;
             annotationRect_ = QRect();
             update();
+            return;
+        }
+        if (textEditor_->isVisible()) {
+            commitTextInput();
+            return;
+        }
+        if (textMode_) {
+            setTextMode(false);
             return;
         }
         if (rectangleMode_) {
@@ -386,6 +433,10 @@ void ScreenshotOverlay::updateCursor(const QPoint &pos) {
         setCursor(selectionRect_.contains(pos) ? Qt::CrossCursor : Qt::ArrowCursor);
         return;
     }
+    if (textMode_) {
+        setCursor(selectionRect_.contains(pos) ? Qt::IBeamCursor : Qt::ArrowCursor);
+        return;
+    }
     setCursor(cursorForDragMode(dragModeForPosition(pos)));
 }
 
@@ -399,6 +450,8 @@ void ScreenshotOverlay::finalizeSelection() {
     selectionRect_ = area;
     selectionLocked_ = true;
     annotationRects_.clear();
+    textAnnotations_.clear();
+    annotationHistory_.clear();
     annotationRect_ = QRect();
     setCursor(Qt::SizeAllCursor);
     showToolbar();
@@ -430,7 +483,10 @@ void ScreenshotOverlay::showToolbar() {
         return;
     }
     toolbar_->setRectangleMode(rectangleMode_);
-    toolbar_->setUndoEnabled(!annotationRects_.isEmpty());
+    toolbar_->setTextMode(textMode_);
+    toolbar_->setUndoEnabled(!annotationHistory_.isEmpty());
+    toolbar_->setCurrentTextSize(currentTextSize_);
+    toolbar_->setCurrentTextColor(currentTextColor_);
     toolbar_->showForSelection(selectionRect_, rect());
 }
 
@@ -444,6 +500,7 @@ bool ScreenshotOverlay::copySelection(bool pin) {
     if (!hasSelection()) {
         return false;
     }
+    commitTextInput();
     QPixmap pix = currentSelectionPixmap();
     if (pix.isNull()) {
         return false;
@@ -462,22 +519,57 @@ void ScreenshotOverlay::toggleRectangleMode() {
 
 void ScreenshotOverlay::setRectangleMode(bool enabled) {
     rectangleMode_ = enabled;
+    if (enabled) {
+        textMode_ = false;
+        cancelTextInput();
+    }
     drawingAnnotation_ = false;
     annotationRect_ = QRect();
     if (toolbar_) {
         toolbar_->setRectangleMode(enabled);
+        if (enabled) {
+            toolbar_->setTextMode(false);
+        }
     }
     setCursor(enabled ? Qt::CrossCursor : Qt::SizeAllCursor);
     update();
 }
 
+void ScreenshotOverlay::toggleTextMode() {
+    setTextMode(!textMode_);
+}
+
+void ScreenshotOverlay::setTextMode(bool enabled) {
+    textMode_ = enabled;
+    if (enabled) {
+        rectangleMode_ = false;
+        drawingAnnotation_ = false;
+        annotationRect_ = QRect();
+    } else {
+        cancelTextInput();
+    }
+    if (toolbar_) {
+        toolbar_->setTextMode(enabled);
+        if (enabled) {
+            toolbar_->setRectangleMode(false);
+        }
+    }
+    setCursor(enabled ? Qt::IBeamCursor : Qt::SizeAllCursor);
+    update();
+}
+
 void ScreenshotOverlay::undoLastAnnotation() {
-    if (annotationRects_.isEmpty()) {
+    if (annotationHistory_.isEmpty()) {
         return;
     }
-    annotationRects_.removeLast();
+    const AnnotationKind kind = annotationHistory_.takeLast();
+    if (kind == AnnotationKind::Rectangle && !annotationRects_.isEmpty()) {
+        annotationRects_.removeLast();
+    } else if (kind == AnnotationKind::Text && !textAnnotations_.isEmpty()) {
+        textAnnotations_.removeLast();
+    }
     if (toolbar_) {
-        toolbar_->setUndoEnabled(!annotationRects_.isEmpty());
+        toolbar_->setUndoEnabled(!annotationHistory_.isEmpty());
     }
     update();
 }
@@ -503,9 +595,24 @@ void ScreenshotOverlay::drawAnnotationRectangles(QPainter &painter) const {
     drawRect(normalizedAnnotationRect());
 }
 
+void ScreenshotOverlay::drawTextAnnotations(QPainter &painter, const QPoint &offset) const {
+    painter.save();
+    painter.setRenderHint(QPainter::Antialiasing, true);
+    for (const TextAnnotation &annotation : textAnnotations_) {
+        QFont font = painter.font();
+        font.setPointSize(annotation.pointSize);
+        painter.setFont(font);
+        painter.setPen(annotation.color);
+        const QFontMetrics metrics(font);
+        const QPoint drawPos = selectionRect_.topLeft() + offset + annotation.pos + QPoint(0, metrics.ascent());
+        painter.drawText(drawPos, annotation.text);
+    }
+    painter.restore();
+}
+
 QPixmap ScreenshotOverlay::renderedSelectionPixmap() const {
     QPixmap pixmap = screenPixmap_.copy(selectionRect_);
-    if (pixmap.isNull() || annotationRects_.isEmpty()) {
+    if (pixmap.isNull()) {
         return pixmap;
     }
 
@@ -518,6 +625,59 @@ QPixmap ScreenshotOverlay::renderedSelectionPixmap() const {
         painter.setPen(QPen(QColor(220, 38, 38, 230), 2.0, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
         painter.drawRoundedRect(rect.adjusted(1, 1, -1, -1), 6, 6);
     }
+    drawTextAnnotations(painter, -selectionRect_.topLeft());
     painter.end();
     return pixmap;
+}
+
+void ScreenshotOverlay::beginTextInput(const QPoint &pos) {
+    if (!textEditor_ || !selectionRect_.contains(pos)) {
+        return;
+    }
+    commitTextInput();
+
+    QFont font = textEditor_->font();
+    font.setPointSize(currentTextSize_);
+    textEditor_->setFont(font);
+    QPalette palette = textEditor_->palette();
+    palette.setColor(QPalette::Text, currentTextColor_);
+    textEditor_->setPalette(palette);
+    const int width = std::max(120, selectionRect_.width() / 3);
+    const int x = std::clamp(pos.x(), selectionRect_.left(), std::max(selectionRect_.left(), selectionRect_.right() - width));
+    const int y = std::clamp(pos.y(), selectionRect_.top(), std::max(selectionRect_.top(), selectionRect_.bottom() - 36));
+    textEditor_->setGeometry(x, y, width, 32);
+    textEditor_->clear();
+    textEditor_->show();
+    textEditor_->raise();
+    textEditor_->setFocus();
+}
+
+void ScreenshotOverlay::commitTextInput() {
+    if (!textEditor_ || !textEditor_->isVisible()) {
+        return;
+    }
+    const QString text = textEditor_->text().trimmed();
+    if (!text.isEmpty()) {
+        TextAnnotation annotation;
+        annotation.text = text;
+        annotation.pos = textEditor_->geometry().topLeft() - selectionRect_.topLeft();
+        annotation.pointSize = currentTextSize_;
+        annotation.color = currentTextColor_;
+        textAnnotations_.append(annotation);
+        annotationHistory_.append(AnnotationKind::Text);
+        if (toolbar_) {
+            toolbar_->setUndoEnabled(true);
+        }
+    }
+    textEditor_->hide();
+    textEditor_->clear();
+    update();
+}
+
+void ScreenshotOverlay::cancelTextInput() {
+    if (!textEditor_) {
+        return;
+    }
+    textEditor_->hide();
+    textEditor_->clear();
 }

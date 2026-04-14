@@ -1,9 +1,11 @@
 #pragma once
 
+#include <QColor>
 #include <QPixmap>
 #include <QVector>
 #include <QWidget>
 
+class QLineEdit;
 class SelectionToolbar;
 
 class ScreenshotOverlay : public QWidget {
@@ -56,10 +58,28 @@ private:
     void updateCursor(const QPoint &pos);
     void toggleRectangleMode();
     void setRectangleMode(bool enabled);
+    void toggleTextMode();
+    void setTextMode(bool enabled);
     void undoLastAnnotation();
     QRect normalizedAnnotationRect() const;
     void drawAnnotationRectangles(QPainter &painter) const;
+    void drawTextAnnotations(QPainter &painter, const QPoint &offset = QPoint()) const;
     QPixmap renderedSelectionPixmap() const;
+    void beginTextInput(const QPoint &pos);
+    void commitTextInput();
+    void cancelTextInput();
+
+    struct TextAnnotation {
+        QString text;
+        QPoint pos;
+        int pointSize = 18;
+        QColor color = QColor("#DC2626");
+    };
+
+    enum class AnnotationKind {
+        Rectangle,
+        Text,
+    };
 
     QPixmap screenPixmap_;
     QRect virtualGeometry_;
@@ -71,9 +91,15 @@ private:
     QPoint annotationAnchor_;
     QRect dragStartRect_;
     QVector<QRect> annotationRects_;
+    QVector<TextAnnotation> textAnnotations_;
+    QVector<AnnotationKind> annotationHistory_;
+    QLineEdit *textEditor_ = nullptr;
+    int currentTextSize_ = 18;
+    QColor currentTextColor_ = QColor("#DC2626");
     bool selecting_ = false;
     bool drawingAnnotation_ = false;
     bool rectangleMode_ = false;
+    bool textMode_ = false;
     bool draggingSelection_ = false;
     bool selectionLocked_ = false;
     DragMode dragMode_ = DragMode::None;
