@@ -58,6 +58,8 @@ private:
     void updateCursor(const QPoint &pos);
     void toggleRectangleMode();
     void setRectangleMode(bool enabled);
+    void toggleArrowMode();
+    void setArrowMode(bool enabled);
     void toggleTextMode();
     void setTextMode(bool enabled);
     void toggleMosaicMode();
@@ -65,6 +67,7 @@ private:
     void undoLastAnnotation();
     QRect normalizedAnnotationRect() const;
     void drawAnnotationRectangles(QPainter &painter) const;
+    void drawArrowAnnotations(QPainter &painter, const QPoint &offset = QPoint()) const;
     void drawMosaicAnnotations(QPainter &painter) const;
     void drawTextAnnotations(QPainter &painter, const QPoint &offset = QPoint()) const;
     QPixmap renderedSelectionPixmap() const;
@@ -79,8 +82,14 @@ private:
         QColor color = QColor("#DC2626");
     };
 
+    struct ArrowAnnotation {
+        QPoint start;
+        QPoint end;
+    };
+
     enum class AnnotationKind {
         Rectangle,
+        Arrow,
         Text,
         Mosaic,
     };
@@ -89,12 +98,15 @@ private:
     QRect virtualGeometry_;
     QRect selectionRect_;
     QRect annotationRect_;
+    QPoint arrowStart_;
+    QPoint arrowEnd_;
     QPoint selectionAnchor_;
     QPoint dragOffset_;
     QPoint resizeAnchor_;
     QPoint annotationAnchor_;
     QRect dragStartRect_;
     QVector<QRect> annotationRects_;
+    QVector<ArrowAnnotation> arrowAnnotations_;
     QVector<QRect> mosaicRects_;
     QVector<TextAnnotation> textAnnotations_;
     QVector<AnnotationKind> annotationHistory_;
@@ -104,6 +116,7 @@ private:
     bool selecting_ = false;
     bool drawingAnnotation_ = false;
     bool rectangleMode_ = false;
+    bool arrowMode_ = false;
     bool textMode_ = false;
     bool mosaicMode_ = false;
     bool draggingSelection_ = false;

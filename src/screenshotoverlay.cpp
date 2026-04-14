@@ -4,11 +4,14 @@
 
 #include <QFontMetrics>
 #include <QKeyEvent>
+#include <QLineF>
 #include <QLineEdit>
 #include <QMouseEvent>
 #include <QPainter>
+#include <QPainterPath>
 #include <QPalette>
 #include <algorithm>
+#include <cmath>
 #include <cstdlib>
 
 namespace {
@@ -17,6 +20,7 @@ constexpr int kResizeMargin = 8;
 constexpr int kMinSelectionSize = 5;
 constexpr int kMinAnnotationSize = 6;
 constexpr int kMosaicCellSize = 14;
+constexpr double kPi = 3.14159265358979323846;
 
 void drawMosaicRegion(QPainter &painter, const QPixmap &source, const QRect &targetRect) {
     if (source.isNull() || targetRect.isNull() || targetRect.width() < 2 || targetRect.height() < 2) {
@@ -33,6 +37,32 @@ void drawMosaicRegion(QPainter &painter, const QPixmap &source, const QRect &tar
     const QPixmap downscaled = region.scaled(scaledSize, Qt::IgnoreAspectRatio, Qt::FastTransformation);
     const QPixmap pixelated = downscaled.scaled(targetRect.size(), Qt::IgnoreAspectRatio, Qt::FastTransformation);
     painter.drawPixmap(targetRect.topLeft(), pixelated);
+}
+
+void drawArrowShape(QPainter &painter, const QPoint &start, const QPoint &end, const QPoint &offset = QPoint()) {
+    const QPointF p1 = start + offset;
+    const QPointF p2 = end + offset;
+    QLineF line(p1, p2);
+    if (line.length() < 4.0) {
+        return;
+    }
+
+    const double arrowSize = 12.0;
+    const double angle = std::atan2(-line.dy(), line.dx());
+    const QPointF arrowP1 = p2 - QPointF(std::cos(angle + kPi / 6) * arrowSize, -std::sin(angle + kPi / 6) * arrowSize);
+    const QPointF arrowP2 = p2 - QPointF(std::cos(angle - kPi / 6) * arrowSize, -std::sin(angle - kPi / 6) * arrowSize);
+
+    painter.save();
+    painter.setRenderHint(QPainter::Antialiasing, true);
+    painter.setPen(QPen(QColor(239, 68, 68, 70), 6.0, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+    painter.drawLine(p1, p2);
+    painter.drawLine(p2, arrowP1);
+    painter.drawLine(p2, arrowP2);
+    painter.setPen(QPen(QColor(220, 38, 38, 235), 3.0, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+    painter.drawLine(p1, p2);
+    painter.drawLine(p2, arrowP1);
+    painter.drawLine(p2, arrowP2);
+    painter.restore();
 }
 }
 
@@ -56,6 +86,7 @@ ScreenshotOverlay::ScreenshotOverlay(QWidget *parent)
     connect(textEditor_, &QLineEdit::editingFinished, this, &ScreenshotOverlay::commitTextInput);
     toolbar_ = new SelectionToolbar(this);
     connect(toolbar_, &SelectionToolbar::rectangleClicked, this, &ScreenshotOverlay::toggleRectangleMode);
+    connect(toolbar_, &SelectionToolbar::arrowClicked, this, &ScreenshotOverlay::toggleArrowMode);
     connect(toolbar_, &SelectionToolbar::textClicked, this, &ScreenshotOverlay::toggleTextMode);
     connect(toolbar_, &SelectionToolbar::mosaicClicked, this, &ScreenshotOverlay::toggleMosaicMode);
     connect(toolbar_, &SelectionToolbar::undoClicked, this, &ScreenshotOverlay::undoLastAnnotation);
@@ -72,9 +103,12 @@ void ScreenshotOverlay::beginCapture(const QPixmap &screenPixmap, const QRect &v
     virtualGeometry_ = virtualGeometry;
     selectionRect_ = QRect();
     annotationRect_ = QRect();
+    arrowStart_ = QPoint();
+    arrowEnd_ = QPoint();
     selecting_ = false;
     drawingAnnotation_ = false;
     rectangleMode_ = false;
+    arrowMode_ = false;
     textMode_ = false;
     mosaicMode_ = false;
     draggingSelection_ = false;
@@ -84,6 +118,7 @@ void ScreenshotOverlay::beginCapture(const QPixmap &screenPixmap, const QRect &v
     annotationAnchor_ = QPoint();
     dragStartRect_ = QRect();
     annotationRects_.clear();
+    arrowAnnotations_.clear();
     mosaicRects_.clear();
     textAnnotations_.clear();
     annotationHistory_.clear();
@@ -95,6 +130,7 @@ void ScreenshotOverlay::beginCapture(const QPixmap &screenPixmap, const QRect &v
     if (toolbar_) {
         toolbar_->setUndoEnabled(false);
         toolbar_->setRectangleMode(false);
+        toolbar_->setArrowMode(false);
         toolbar_->setTextMode(false);
         toolbar_->setMosaicMode(false);
         toolbar_->setCurrentTextSize(currentTextSize_);
@@ -109,9 +145,12 @@ void ScreenshotOverlay::beginCapture(const QPixmap &screenPixmap, const QRect &v
 void ScreenshotOverlay::resetState() {
     selectionRect_ = QRect();
     annotationRect_ = QRect();
+    arrowStart_ = QPoint();
+    arrowEnd_ = QPoint();
     selecting_ = false;
     drawingAnnotation_ = false;
     rectangleMode_ = false;
+    arrowMode_ = false;
     textMode_ = false;
     mosaicMode_ = false;
     draggingSelection_ = false;
@@ -121,6 +160,7 @@ void ScreenshotOverlay::resetState() {
     annotationAnchor_ = QPoint();
     dragStartRect_ = QRect();
     annotationRects_.clear();
+    arrowAnnotations_.clear();
     mosaicRects_.clear();
     textAnnotations_.clear();
     annotationHistory_.clear();
@@ -150,6 +190,7 @@ void ScreenshotOverlay::paintEvent(QPaintEvent *) {
         painter.setPen(QPen(Qt::white, 1));
         painter.drawRect(selection.adjusted(0, 0, -1, -1));
         drawAnnotationRectangles(painter);
+        drawArrowAnnotations(painter);
         drawTextAnnotations(painter);
     }
 }
@@ -170,13 +211,15 @@ void ScreenshotOverlay::mousePressEvent(QMouseEvent *event) {
             beginTextInput(event->pos());
             return;
         }
-        if (rectangleMode_ || mosaicMode_) {
+        if (rectangleMode_ || mosaicMode_ || arrowMode_) {
             if (!selectionRect_.contains(event->pos())) {
                 return;
             }
             drawingAnnotation_ = true;
             annotationAnchor_ = event->pos();
             annotationRect_ = QRect(annotationAnchor_, annotationAnchor_);
+            arrowStart_ = event->pos();
+            arrowEnd_ = event->pos();
             update();
             return;
         }
@@ -209,6 +252,7 @@ void ScreenshotOverlay::mouseMoveEvent(QMouseEvent *event) {
         currentPos.setX(std::clamp(currentPos.x(), selectionRect_.left(), selectionRect_.right()));
         currentPos.setY(std::clamp(currentPos.y(), selectionRect_.top(), selectionRect_.bottom()));
         annotationRect_ = QRect(annotationAnchor_, currentPos).normalized();
+        arrowEnd_ = currentPos;
         update();
         return;
     }
@@ -239,7 +283,17 @@ void ScreenshotOverlay::mouseReleaseEvent(QMouseEvent *event) {
     if (drawingAnnotation_) {
         drawingAnnotation_ = false;
         const QRect rect = normalizedAnnotationRect();
-        if (!rect.isNull() && rect.width() >= kMinAnnotationSize && rect.height() >= kMinAnnotationSize) {
+        const QPoint localStart = arrowStart_ - selectionRect_.topLeft();
+        const QPoint localEnd = arrowEnd_ - selectionRect_.topLeft();
+        if (arrowMode_) {
+            if (QLineF(localStart, localEnd).length() >= kMinAnnotationSize) {
+                arrowAnnotations_.append({localStart, localEnd});
+                annotationHistory_.append(AnnotationKind::Arrow);
+                if (toolbar_) {
+                    toolbar_->setUndoEnabled(true);
+                }
+            }
+        } else if (!rect.isNull() && rect.width() >= kMinAnnotationSize && rect.height() >= kMinAnnotationSize) {
             const QRect localRect = rect.translated(-selectionRect_.topLeft());
             if (mosaicMode_) {
                 mosaicRects_.append(localRect);
@@ -253,6 +307,8 @@ void ScreenshotOverlay::mouseReleaseEvent(QMouseEvent *event) {
             }
         }
         annotationRect_ = QRect();
+        arrowStart_ = QPoint();
+        arrowEnd_ = QPoint();
         update();
         return;
     }
@@ -290,6 +346,10 @@ void ScreenshotOverlay::keyPressEvent(QKeyEvent *event) {
         }
         if (mosaicMode_) {
             setMosaicMode(false);
+            return;
+        }
+        if (arrowMode_) {
+            setArrowMode(false);
             return;
         }
         if (rectangleMode_) {
@@ -476,6 +536,10 @@ void ScreenshotOverlay::updateCursor(const QPoint &pos) {
         setCursor(selectionRect_.contains(pos) ? Qt::CrossCursor : Qt::ArrowCursor);
         return;
     }
+    if (arrowMode_) {
+        setCursor(selectionRect_.contains(pos) ? Qt::CrossCursor : Qt::ArrowCursor);
+        return;
+    }
     setCursor(cursorForDragMode(dragModeForPosition(pos)));
 }
 
@@ -489,6 +553,7 @@ void ScreenshotOverlay::finalizeSelection() {
     selectionRect_ = area;
     selectionLocked_ = true;
     annotationRects_.clear();
+    arrowAnnotations_.clear();
     mosaicRects_.clear();
     textAnnotations_.clear();
     annotationHistory_.clear();
@@ -523,6 +588,7 @@ void ScreenshotOverlay::showToolbar() {
         return;
     }
     toolbar_->setRectangleMode(rectangleMode_);
+    toolbar_->setArrowMode(arrowMode_);
     toolbar_->setTextMode(textMode_);
     toolbar_->setMosaicMode(mosaicMode_);
     toolbar_->setUndoEnabled(!annotationHistory_.isEmpty());
@@ -561,6 +627,7 @@ void ScreenshotOverlay::toggleRectangleMode() {
 void ScreenshotOverlay::setRectangleMode(bool enabled) {
     rectangleMode_ = enabled;
     if (enabled) {
+        arrowMode_ = false;
         textMode_ = false;
         mosaicMode_ = false;
         cancelTextInput();
@@ -570,6 +637,33 @@ void ScreenshotOverlay::setRectangleMode(bool enabled) {
     if (toolbar_) {
         toolbar_->setRectangleMode(enabled);
         if (enabled) {
+            toolbar_->setArrowMode(false);
+            toolbar_->setTextMode(false);
+            toolbar_->setMosaicMode(false);
+        }
+    }
+    setCursor(enabled ? Qt::CrossCursor : Qt::SizeAllCursor);
+    update();
+}
+
+void ScreenshotOverlay::toggleArrowMode() {
+    setArrowMode(!arrowMode_);
+}
+
+void ScreenshotOverlay::setArrowMode(bool enabled) {
+    arrowMode_ = enabled;
+    if (enabled) {
+        rectangleMode_ = false;
+        textMode_ = false;
+        mosaicMode_ = false;
+        drawingAnnotation_ = false;
+        annotationRect_ = QRect();
+        cancelTextInput();
+    }
+    if (toolbar_) {
+        toolbar_->setArrowMode(enabled);
+        if (enabled) {
+            toolbar_->setRectangleMode(false);
             toolbar_->setTextMode(false);
             toolbar_->setMosaicMode(false);
         }
@@ -586,6 +680,7 @@ void ScreenshotOverlay::setTextMode(bool enabled) {
     textMode_ = enabled;
     if (enabled) {
         rectangleMode_ = false;
+        arrowMode_ = false;
         mosaicMode_ = false;
         drawingAnnotation_ = false;
         annotationRect_ = QRect();
@@ -596,6 +691,7 @@ void ScreenshotOverlay::setTextMode(bool enabled) {
         toolbar_->setTextMode(enabled);
         if (enabled) {
             toolbar_->setRectangleMode(false);
+            toolbar_->setArrowMode(false);
             toolbar_->setMosaicMode(false);
         }
     }
@@ -611,6 +707,7 @@ void ScreenshotOverlay::setMosaicMode(bool enabled) {
     mosaicMode_ = enabled;
     if (enabled) {
         rectangleMode_ = false;
+        arrowMode_ = false;
         textMode_ = false;
         drawingAnnotation_ = false;
         annotationRect_ = QRect();
@@ -620,6 +717,7 @@ void ScreenshotOverlay::setMosaicMode(bool enabled) {
         toolbar_->setMosaicMode(enabled);
         if (enabled) {
             toolbar_->setRectangleMode(false);
+            toolbar_->setArrowMode(false);
             toolbar_->setTextMode(false);
         }
     }
@@ -634,6 +732,8 @@ void ScreenshotOverlay::undoLastAnnotation() {
     const AnnotationKind kind = annotationHistory_.takeLast();
     if (kind == AnnotationKind::Rectangle && !annotationRects_.isEmpty()) {
         annotationRects_.removeLast();
+    } else if (kind == AnnotationKind::Arrow && !arrowAnnotations_.isEmpty()) {
+        arrowAnnotations_.removeLast();
     } else if (kind == AnnotationKind::Mosaic && !mosaicRects_.isEmpty()) {
         mosaicRects_.removeLast();
     } else if (kind == AnnotationKind::Text && !textAnnotations_.isEmpty()) {
@@ -665,6 +765,15 @@ void ScreenshotOverlay::drawAnnotationRectangles(QPainter &painter) const {
     }
     if (rectangleMode_ && drawingAnnotation_) {
         drawRect(normalizedAnnotationRect());
+    }
+}
+
+void ScreenshotOverlay::drawArrowAnnotations(QPainter &painter, const QPoint &offset) const {
+    for (const ArrowAnnotation &annotation : arrowAnnotations_) {
+        drawArrowShape(painter, annotation.start, annotation.end, selectionRect_.topLeft() + offset);
+    }
+    if (arrowMode_ && drawingAnnotation_) {
+        drawArrowShape(painter, arrowStart_, arrowEnd_);
     }
 }
 
@@ -710,6 +819,7 @@ QPixmap ScreenshotOverlay::renderedSelectionPixmap() const {
         painter.setPen(QPen(QColor(220, 38, 38, 230), 2.0, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
         painter.drawRoundedRect(rect.adjusted(1, 1, -1, -1), 6, 6);
     }
+    drawArrowAnnotations(painter, -selectionRect_.topLeft());
     drawTextAnnotations(painter, -selectionRect_.topLeft());
     painter.end();
     return pixmap;

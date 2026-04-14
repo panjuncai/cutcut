@@ -18,6 +18,7 @@ public:
 
     void showForSelection(const QRect &selection, const QRect &overlayRect);
     void setRectangleMode(bool enabled);
+    void setArrowMode(bool enabled);
     void setTextMode(bool enabled);
     void setMosaicMode(bool enabled);
     void setUndoEnabled(bool enabled);
@@ -26,6 +27,7 @@ public:
 
 signals:
     void rectangleClicked();
+    void arrowClicked();
     void textClicked();
     void mosaicClicked();
     void undoClicked();
@@ -53,6 +55,7 @@ private:
     QComboBox *fontSizeCombo_ = nullptr;
     QVector<QToolButton *> colorButtons_;
     QToolButton *rectangleButton_ = nullptr;
+    QToolButton *arrowButton_ = nullptr;
     QToolButton *textButton_ = nullptr;
     QToolButton *mosaicButton_ = nullptr;
     QToolButton *undoButton_ = nullptr;

@@ -82,6 +82,16 @@ QIcon makeRectangleIcon() {
     return makeSvgIcon(kRectangleSvg, QSize(kIconSize, kIconSize));
 }
 
+QIcon makeArrowIcon() {
+    constexpr auto kArrowSvg = R"svg(
+<svg width="22" height="22" viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path d="M10.2 17.4H4.8V12" stroke="#374151" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M17.2 4.8L4.8 17.2" stroke="#374151" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
+)svg";
+    return makeSvgIcon(kArrowSvg, QSize(kIconSize, kIconSize));
+}
+
 QIcon makeUndoIcon() {
     constexpr auto kUndoSvg = R"svg(
 <svg width="22" height="22" viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -206,6 +216,7 @@ SelectionToolbar::SelectionToolbar(QWidget *parent)
     auto *grip = new GripHandle(this);
 
     rectangleButton_ = makeIconButton(makeRectangleIcon(), tr("Rectangle"));
+    arrowButton_ = makeIconButton(makeArrowIcon(), tr("Arrow"));
     textButton_ = makeIconButton(makeTypeIcon(), tr("Text"));
     mosaicButton_ = makeIconButton(makeMosaicIcon(), tr("Mosaic"));
     undoButton_ = makeIconButton(makeUndoIcon(), tr("Undo"));
@@ -213,6 +224,7 @@ SelectionToolbar::SelectionToolbar(QWidget *parent)
     copyButton_ = makeIconButton(makeCheckIcon(), tr("Copy"));
     closeButton_ = makeIconButton(makeCloseIcon(), tr("Cancel"));
     rectangleButton_->setCheckable(true);
+    arrowButton_->setCheckable(true);
     textButton_->setCheckable(true);
     mosaicButton_->setCheckable(true);
     undoButton_->setEnabled(false);
@@ -222,6 +234,7 @@ SelectionToolbar::SelectionToolbar(QWidget *parent)
     layout->addWidget(makeDivider());
     layout->addSpacing(3);
     layout->addWidget(rectangleButton_);
+    layout->addWidget(arrowButton_);
     layout->addWidget(textButton_);
     layout->addWidget(mosaicButton_);
     layout->addWidget(undoButton_);
@@ -285,6 +298,7 @@ SelectionToolbar::SelectionToolbar(QWidget *parent)
     }
 
     connect(rectangleButton_, &QToolButton::clicked, this, &SelectionToolbar::rectangleClicked);
+    connect(arrowButton_, &QToolButton::clicked, this, &SelectionToolbar::arrowClicked);
     connect(textButton_, &QToolButton::clicked, this, &SelectionToolbar::textClicked);
     connect(mosaicButton_, &QToolButton::clicked, this, &SelectionToolbar::mosaicClicked);
     connect(undoButton_, &QToolButton::clicked, this, &SelectionToolbar::undoClicked);
@@ -339,7 +353,43 @@ void SelectionToolbar::setRectangleMode(bool enabled) {
                                           "background: rgba(27, 31, 38, 0.14);"
                                           "}");
     if (enabled) {
+        setArrowMode(false);
         setTextMode(false);
+    }
+}
+
+void SelectionToolbar::setArrowMode(bool enabled) {
+    if (!arrowButton_) {
+        return;
+    }
+    arrowButton_->setChecked(enabled);
+    arrowButton_->setStyleSheet(enabled
+                                    ? "QToolButton {"
+                                      "background: rgba(220, 38, 38, 0.12);"
+                                      "border: none;"
+                                      "border-radius: 8px;"
+                                      "}"
+                                      "QToolButton:hover {"
+                                      "background: rgba(220, 38, 38, 0.16);"
+                                      "}"
+                                      "QToolButton:pressed {"
+                                      "background: rgba(220, 38, 38, 0.22);"
+                                      "}"
+                                    : "QToolButton {"
+                                      "background: transparent;"
+                                      "border: none;"
+                                      "border-radius: 8px;"
+                                      "}"
+                                      "QToolButton:hover {"
+                                      "background: rgba(27, 31, 38, 0.08);"
+                                      "}"
+                                      "QToolButton:pressed {"
+                                      "background: rgba(27, 31, 38, 0.14);"
+                                      "}");
+    if (enabled) {
+        setRectangleMode(false);
+        setTextMode(false);
+        setMosaicMode(false);
     }
 }
 
@@ -375,6 +425,7 @@ void SelectionToolbar::setTextMode(bool enabled) {
     updateSettingsPanelPosition();
     if (enabled) {
         setRectangleMode(false);
+        setArrowMode(false);
         setMosaicMode(false);
     }
 }
@@ -409,6 +460,7 @@ void SelectionToolbar::setMosaicMode(bool enabled) {
                                        "}");
     if (enabled) {
         setRectangleMode(false);
+        setArrowMode(false);
         setTextMode(false);
     }
 }
