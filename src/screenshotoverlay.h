@@ -29,18 +29,41 @@ protected:
     void keyPressEvent(QKeyEvent *event) override;
 
 private:
+    enum class DragMode {
+        None,
+        Move,
+        ResizeTop,
+        ResizeBottom,
+        ResizeLeft,
+        ResizeRight,
+        ResizeTopLeft,
+        ResizeTopRight,
+        ResizeBottomLeft,
+        ResizeBottomRight,
+    };
+
     void resetState();
     QRect normalizedSelection() const;
     void finalizeSelection();
     void cancelCaptureInternal();
     void showToolbar();
     void hideToolbar();
+    QRect clampedSelection(const QPoint &topLeft) const;
+    QRect resizedSelection(const QPoint &pos) const;
+    DragMode dragModeForPosition(const QPoint &pos) const;
+    Qt::CursorShape cursorForDragMode(DragMode mode) const;
+    void updateCursor(const QPoint &pos);
 
     QPixmap screenPixmap_;
     QRect virtualGeometry_;
     QRect selectionRect_;
     QPoint selectionAnchor_;
+    QPoint dragOffset_;
+    QPoint resizeAnchor_;
+    QRect dragStartRect_;
     bool selecting_ = false;
+    bool draggingSelection_ = false;
     bool selectionLocked_ = false;
+    DragMode dragMode_ = DragMode::None;
     SelectionToolbar *toolbar_ = nullptr;
 };
