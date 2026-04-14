@@ -2,6 +2,7 @@
 
 #include <QWidget>
 
+class QMouseEvent;
 class QToolButton;
 
 class SelectionToolbar : public QWidget {
@@ -14,8 +15,21 @@ public:
 signals:
     void copyClicked();
     void pinClicked();
+    void closeClicked();
+
+protected:
+    void paintEvent(QPaintEvent *event) override;
+    void mousePressEvent(QMouseEvent *event) override;
+    void mouseMoveEvent(QMouseEvent *event) override;
+    void mouseReleaseEvent(QMouseEvent *event) override;
 
 private:
+    QPoint clampPosition(const QPoint &pos) const;
+
+    QRect overlayRect_;
+    bool dragging_ = false;
+    QPoint dragOffset_;
     QToolButton *copyButton_ = nullptr;
     QToolButton *pinButton_ = nullptr;
+    QToolButton *closeButton_ = nullptr;
 };

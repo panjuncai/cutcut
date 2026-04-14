@@ -23,6 +23,7 @@ ScreenshotOverlay::ScreenshotOverlay(QWidget *parent)
     toolbar_ = new SelectionToolbar(this);
     connect(toolbar_, &SelectionToolbar::copyClicked, this, [this]() { copySelection(false); });
     connect(toolbar_, &SelectionToolbar::pinClicked, this, [this]() { copySelection(true); });
+    connect(toolbar_, &SelectionToolbar::closeClicked, this, &ScreenshotOverlay::cancelCaptureInternal);
     hide();
 }
 
