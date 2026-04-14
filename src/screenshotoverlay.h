@@ -60,9 +60,12 @@ private:
     void setRectangleMode(bool enabled);
     void toggleTextMode();
     void setTextMode(bool enabled);
+    void toggleMosaicMode();
+    void setMosaicMode(bool enabled);
     void undoLastAnnotation();
     QRect normalizedAnnotationRect() const;
     void drawAnnotationRectangles(QPainter &painter) const;
+    void drawMosaicAnnotations(QPainter &painter) const;
     void drawTextAnnotations(QPainter &painter, const QPoint &offset = QPoint()) const;
     QPixmap renderedSelectionPixmap() const;
     void beginTextInput(const QPoint &pos);
@@ -79,6 +82,7 @@ private:
     enum class AnnotationKind {
         Rectangle,
         Text,
+        Mosaic,
     };
 
     QPixmap screenPixmap_;
@@ -91,6 +95,7 @@ private:
     QPoint annotationAnchor_;
     QRect dragStartRect_;
     QVector<QRect> annotationRects_;
+    QVector<QRect> mosaicRects_;
     QVector<TextAnnotation> textAnnotations_;
     QVector<AnnotationKind> annotationHistory_;
     QLineEdit *textEditor_ = nullptr;
@@ -100,6 +105,7 @@ private:
     bool drawingAnnotation_ = false;
     bool rectangleMode_ = false;
     bool textMode_ = false;
+    bool mosaicMode_ = false;
     bool draggingSelection_ = false;
     bool selectionLocked_ = false;
     DragMode dragMode_ = DragMode::None;

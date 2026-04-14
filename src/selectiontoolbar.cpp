@@ -103,6 +103,17 @@ QIcon makeTypeIcon() {
     return makeSvgIcon(kTypeSvg, QSize(kIconSize, kIconSize));
 }
 
+QIcon makeMosaicIcon() {
+    constexpr auto kMosaicSvg = R"svg(
+<svg width="22" height="22" viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path d="M11 3.2V18.8" stroke="#374151" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M3.2 11H18.8" stroke="#374151" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="3.2" y="3.2" width="15.6" height="15.6" rx="1.8" stroke="#374151" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
+)svg";
+    return makeSvgIcon(kMosaicSvg, QSize(kIconSize, kIconSize));
+}
+
 QIcon makeCloseIcon() {
     constexpr auto kCloseSvg = R"svg(
 <svg width="22" height="22" viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -196,12 +207,14 @@ SelectionToolbar::SelectionToolbar(QWidget *parent)
 
     rectangleButton_ = makeIconButton(makeRectangleIcon(), tr("Rectangle"));
     textButton_ = makeIconButton(makeTypeIcon(), tr("Text"));
+    mosaicButton_ = makeIconButton(makeMosaicIcon(), tr("Mosaic"));
     undoButton_ = makeIconButton(makeUndoIcon(), tr("Undo"));
     pinButton_ = makeIconButton(makePinIcon(), tr("Pin"));
     copyButton_ = makeIconButton(makeCheckIcon(), tr("Copy"));
     closeButton_ = makeIconButton(makeCloseIcon(), tr("Cancel"));
     rectangleButton_->setCheckable(true);
     textButton_->setCheckable(true);
+    mosaicButton_->setCheckable(true);
     undoButton_->setEnabled(false);
 
     layout->addWidget(grip);
@@ -210,6 +223,7 @@ SelectionToolbar::SelectionToolbar(QWidget *parent)
     layout->addSpacing(3);
     layout->addWidget(rectangleButton_);
     layout->addWidget(textButton_);
+    layout->addWidget(mosaicButton_);
     layout->addWidget(undoButton_);
     layout->addWidget(pinButton_);
     layout->addWidget(closeButton_);
@@ -228,12 +242,24 @@ SelectionToolbar::SelectionToolbar(QWidget *parent)
     fontSizeCombo_->setFixedHeight(28);
     fontSizeCombo_->setStyleSheet("QComboBox {"
                                   "background: rgb(249, 250, 251);"
+                                  "color: rgb(31, 41, 55);"
                                   "border: 1px solid rgba(148, 163, 184, 0.35);"
                                   "border-radius: 8px;"
                                   "padding: 2px 10px;"
                                   "min-width: 72px;"
                                   "}"
-                                  "QComboBox::drop-down { border: none; width: 18px; }");
+                                  "QComboBox:hover {"
+                                  "color: rgb(31, 41, 55);"
+                                  "}"
+                                  "QComboBox::drop-down { border: none; width: 18px; }"
+                                  "QComboBox QAbstractItemView {"
+                                  "background: rgb(255, 255, 255);"
+                                  "color: rgb(31, 41, 55);"
+                                  "selection-background-color: rgba(59, 130, 246, 0.12);"
+                                  "selection-color: rgb(31, 41, 55);"
+                                  "border: 1px solid rgba(148, 163, 184, 0.25);"
+                                  "outline: none;"
+                                  "}");
     settingsLayout->addWidget(fontSizeCombo_);
     auto *settingsDivider = makeDivider();
     settingsDivider->setFixedHeight(24);
@@ -260,6 +286,7 @@ SelectionToolbar::SelectionToolbar(QWidget *parent)
 
     connect(rectangleButton_, &QToolButton::clicked, this, &SelectionToolbar::rectangleClicked);
     connect(textButton_, &QToolButton::clicked, this, &SelectionToolbar::textClicked);
+    connect(mosaicButton_, &QToolButton::clicked, this, &SelectionToolbar::mosaicClicked);
     connect(undoButton_, &QToolButton::clicked, this, &SelectionToolbar::undoClicked);
     connect(copyButton_, &QToolButton::clicked, this, &SelectionToolbar::copyClicked);
     connect(pinButton_, &QToolButton::clicked, this, &SelectionToolbar::pinClicked);
@@ -348,6 +375,41 @@ void SelectionToolbar::setTextMode(bool enabled) {
     updateSettingsPanelPosition();
     if (enabled) {
         setRectangleMode(false);
+        setMosaicMode(false);
+    }
+}
+
+void SelectionToolbar::setMosaicMode(bool enabled) {
+    if (!mosaicButton_) {
+        return;
+    }
+    mosaicButton_->setChecked(enabled);
+    mosaicButton_->setStyleSheet(enabled
+                                     ? "QToolButton {"
+                                       "background: rgba(55, 65, 81, 0.12);"
+                                       "border: none;"
+                                       "border-radius: 8px;"
+                                       "}"
+                                       "QToolButton:hover {"
+                                       "background: rgba(55, 65, 81, 0.16);"
+                                       "}"
+                                       "QToolButton:pressed {"
+                                       "background: rgba(55, 65, 81, 0.22);"
+                                       "}"
+                                     : "QToolButton {"
+                                       "background: transparent;"
+                                       "border: none;"
+                                       "border-radius: 8px;"
+                                       "}"
+                                       "QToolButton:hover {"
+                                       "background: rgba(27, 31, 38, 0.08);"
+                                       "}"
+                                       "QToolButton:pressed {"
+                                       "background: rgba(27, 31, 38, 0.14);"
+                                       "}");
+    if (enabled) {
+        setRectangleMode(false);
+        setTextMode(false);
     }
 }
 

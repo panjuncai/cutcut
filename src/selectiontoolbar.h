@@ -19,6 +19,7 @@ public:
     void showForSelection(const QRect &selection, const QRect &overlayRect);
     void setRectangleMode(bool enabled);
     void setTextMode(bool enabled);
+    void setMosaicMode(bool enabled);
     void setUndoEnabled(bool enabled);
     void setCurrentTextSize(int size);
     void setCurrentTextColor(const QColor &color);
@@ -26,6 +27,7 @@ public:
 signals:
     void rectangleClicked();
     void textClicked();
+    void mosaicClicked();
     void undoClicked();
     void copyClicked();
     void pinClicked();
@@ -52,6 +54,7 @@ private:
     QVector<QToolButton *> colorButtons_;
     QToolButton *rectangleButton_ = nullptr;
     QToolButton *textButton_ = nullptr;
+    QToolButton *mosaicButton_ = nullptr;
     QToolButton *undoButton_ = nullptr;
     QToolButton *copyButton_ = nullptr;
     QToolButton *pinButton_ = nullptr;

@@ -16,6 +16,24 @@ constexpr QColor kShadeColor(0, 0, 0, 140);
 constexpr int kResizeMargin = 8;
 constexpr int kMinSelectionSize = 5;
 constexpr int kMinAnnotationSize = 6;
+constexpr int kMosaicCellSize = 14;
+
+void drawMosaicRegion(QPainter &painter, const QPixmap &source, const QRect &targetRect) {
+    if (source.isNull() || targetRect.isNull() || targetRect.width() < 2 || targetRect.height() < 2) {
+        return;
+    }
+
+    const QPixmap region = source.copy(targetRect);
+    if (region.isNull()) {
+        return;
+    }
+
+    const QSize scaledSize(std::max(1, targetRect.width() / kMosaicCellSize),
+                           std::max(1, targetRect.height() / kMosaicCellSize));
+    const QPixmap downscaled = region.scaled(scaledSize, Qt::IgnoreAspectRatio, Qt::FastTransformation);
+    const QPixmap pixelated = downscaled.scaled(targetRect.size(), Qt::IgnoreAspectRatio, Qt::FastTransformation);
+    painter.drawPixmap(targetRect.topLeft(), pixelated);
+}
 }
 
 ScreenshotOverlay::ScreenshotOverlay(QWidget *parent)
@@ -39,6 +57,7 @@ ScreenshotOverlay::ScreenshotOverlay(QWidget *parent)
     toolbar_ = new SelectionToolbar(this);
     connect(toolbar_, &SelectionToolbar::rectangleClicked, this, &ScreenshotOverlay::toggleRectangleMode);
     connect(toolbar_, &SelectionToolbar::textClicked, this, &ScreenshotOverlay::toggleTextMode);
+    connect(toolbar_, &SelectionToolbar::mosaicClicked, this, &ScreenshotOverlay::toggleMosaicMode);
     connect(toolbar_, &SelectionToolbar::undoClicked, this, &ScreenshotOverlay::undoLastAnnotation);
     connect(toolbar_, &SelectionToolbar::copyClicked, this, [this]() { copySelection(false); });
     connect(toolbar_, &SelectionToolbar::pinClicked, this, [this]() { copySelection(true); });
@@ -57,6 +76,7 @@ void ScreenshotOverlay::beginCapture(const QPixmap &screenPixmap, const QRect &v
     drawingAnnotation_ = false;
     rectangleMode_ = false;
     textMode_ = false;
+    mosaicMode_ = false;
     draggingSelection_ = false;
     selectionAnchor_ = QPoint();
     dragOffset_ = QPoint();
@@ -64,6 +84,7 @@ void ScreenshotOverlay::beginCapture(const QPixmap &screenPixmap, const QRect &v
     annotationAnchor_ = QPoint();
     dragStartRect_ = QRect();
     annotationRects_.clear();
+    mosaicRects_.clear();
     textAnnotations_.clear();
     annotationHistory_.clear();
     selectionLocked_ = false;
@@ -75,6 +96,7 @@ void ScreenshotOverlay::beginCapture(const QPixmap &screenPixmap, const QRect &v
         toolbar_->setUndoEnabled(false);
         toolbar_->setRectangleMode(false);
         toolbar_->setTextMode(false);
+        toolbar_->setMosaicMode(false);
         toolbar_->setCurrentTextSize(currentTextSize_);
         toolbar_->setCurrentTextColor(currentTextColor_);
     }
@@ -91,6 +113,7 @@ void ScreenshotOverlay::resetState() {
     drawingAnnotation_ = false;
     rectangleMode_ = false;
     textMode_ = false;
+    mosaicMode_ = false;
     draggingSelection_ = false;
     selectionAnchor_ = QPoint();
     dragOffset_ = QPoint();
@@ -98,6 +121,7 @@ void ScreenshotOverlay::resetState() {
     annotationAnchor_ = QPoint();
     dragStartRect_ = QRect();
     annotationRects_.clear();
+    mosaicRects_.clear();
     textAnnotations_.clear();
     annotationHistory_.clear();
     selectionLocked_ = false;
@@ -122,6 +146,7 @@ void ScreenshotOverlay::paintEvent(QPaintEvent *) {
     const QRect selection = normalizedSelection();
     if (!selection.isNull()) {
         painter.drawPixmap(selection.topLeft(), screenPixmap_.copy(selection));
+        drawMosaicAnnotations(painter);
         painter.setPen(QPen(Qt::white, 1));
         painter.drawRect(selection.adjusted(0, 0, -1, -1));
         drawAnnotationRectangles(painter);
@@ -145,7 +170,7 @@ void ScreenshotOverlay::mousePressEvent(QMouseEvent *event) {
             beginTextInput(event->pos());
             return;
         }
-        if (rectangleMode_) {
+        if (rectangleMode_ || mosaicMode_) {
             if (!selectionRect_.contains(event->pos())) {
                 return;
             }
@@ -215,8 +240,14 @@ void ScreenshotOverlay::mouseReleaseEvent(QMouseEvent *event) {
         drawingAnnotation_ = false;
         const QRect rect = normalizedAnnotationRect();
         if (!rect.isNull() && rect.width() >= kMinAnnotationSize && rect.height() >= kMinAnnotationSize) {
-            annotationRects_.append(rect.translated(-selectionRect_.topLeft()));
-            annotationHistory_.append(AnnotationKind::Rectangle);
+            const QRect localRect = rect.translated(-selectionRect_.topLeft());
+            if (mosaicMode_) {
+                mosaicRects_.append(localRect);
+                annotationHistory_.append(AnnotationKind::Mosaic);
+            } else {
+                annotationRects_.append(localRect);
+                annotationHistory_.append(AnnotationKind::Rectangle);
+            }
             if (toolbar_) {
                 toolbar_->setUndoEnabled(true);
             }
@@ -255,6 +286,10 @@ void ScreenshotOverlay::keyPressEvent(QKeyEvent *event) {
         }
         if (textMode_) {
             setTextMode(false);
+            return;
+        }
+        if (mosaicMode_) {
+            setMosaicMode(false);
             return;
         }
         if (rectangleMode_) {
@@ -437,6 +472,10 @@ void ScreenshotOverlay::updateCursor(const QPoint &pos) {
         setCursor(selectionRect_.contains(pos) ? Qt::IBeamCursor : Qt::ArrowCursor);
         return;
     }
+    if (mosaicMode_) {
+        setCursor(selectionRect_.contains(pos) ? Qt::CrossCursor : Qt::ArrowCursor);
+        return;
+    }
     setCursor(cursorForDragMode(dragModeForPosition(pos)));
 }
 
@@ -450,6 +489,7 @@ void ScreenshotOverlay::finalizeSelection() {
     selectionRect_ = area;
     selectionLocked_ = true;
     annotationRects_.clear();
+    mosaicRects_.clear();
     textAnnotations_.clear();
     annotationHistory_.clear();
     annotationRect_ = QRect();
@@ -484,6 +524,7 @@ void ScreenshotOverlay::showToolbar() {
     }
     toolbar_->setRectangleMode(rectangleMode_);
     toolbar_->setTextMode(textMode_);
+    toolbar_->setMosaicMode(mosaicMode_);
     toolbar_->setUndoEnabled(!annotationHistory_.isEmpty());
     toolbar_->setCurrentTextSize(currentTextSize_);
     toolbar_->setCurrentTextColor(currentTextColor_);
@@ -521,6 +562,7 @@ void ScreenshotOverlay::setRectangleMode(bool enabled) {
     rectangleMode_ = enabled;
     if (enabled) {
         textMode_ = false;
+        mosaicMode_ = false;
         cancelTextInput();
     }
     drawingAnnotation_ = false;
@@ -529,6 +571,7 @@ void ScreenshotOverlay::setRectangleMode(bool enabled) {
         toolbar_->setRectangleMode(enabled);
         if (enabled) {
             toolbar_->setTextMode(false);
+            toolbar_->setMosaicMode(false);
         }
     }
     setCursor(enabled ? Qt::CrossCursor : Qt::SizeAllCursor);
@@ -543,6 +586,7 @@ void ScreenshotOverlay::setTextMode(bool enabled) {
     textMode_ = enabled;
     if (enabled) {
         rectangleMode_ = false;
+        mosaicMode_ = false;
         drawingAnnotation_ = false;
         annotationRect_ = QRect();
     } else {
@@ -552,9 +596,34 @@ void ScreenshotOverlay::setTextMode(bool enabled) {
         toolbar_->setTextMode(enabled);
         if (enabled) {
             toolbar_->setRectangleMode(false);
+            toolbar_->setMosaicMode(false);
         }
     }
     setCursor(enabled ? Qt::IBeamCursor : Qt::SizeAllCursor);
+    update();
+}
+
+void ScreenshotOverlay::toggleMosaicMode() {
+    setMosaicMode(!mosaicMode_);
+}
+
+void ScreenshotOverlay::setMosaicMode(bool enabled) {
+    mosaicMode_ = enabled;
+    if (enabled) {
+        rectangleMode_ = false;
+        textMode_ = false;
+        drawingAnnotation_ = false;
+        annotationRect_ = QRect();
+        cancelTextInput();
+    }
+    if (toolbar_) {
+        toolbar_->setMosaicMode(enabled);
+        if (enabled) {
+            toolbar_->setRectangleMode(false);
+            toolbar_->setTextMode(false);
+        }
+    }
+    setCursor(enabled ? Qt::CrossCursor : Qt::SizeAllCursor);
     update();
 }
 
@@ -565,6 +634,8 @@ void ScreenshotOverlay::undoLastAnnotation() {
     const AnnotationKind kind = annotationHistory_.takeLast();
     if (kind == AnnotationKind::Rectangle && !annotationRects_.isEmpty()) {
         annotationRects_.removeLast();
+    } else if (kind == AnnotationKind::Mosaic && !mosaicRects_.isEmpty()) {
+        mosaicRects_.removeLast();
     } else if (kind == AnnotationKind::Text && !textAnnotations_.isEmpty()) {
         textAnnotations_.removeLast();
     }
@@ -592,7 +663,18 @@ void ScreenshotOverlay::drawAnnotationRectangles(QPainter &painter) const {
     for (const QRect &rect : annotationRects_) {
         drawRect(rect.translated(selectionRect_.topLeft()));
     }
-    drawRect(normalizedAnnotationRect());
+    if (rectangleMode_ && drawingAnnotation_) {
+        drawRect(normalizedAnnotationRect());
+    }
+}
+
+void ScreenshotOverlay::drawMosaicAnnotations(QPainter &painter) const {
+    for (const QRect &rect : mosaicRects_) {
+        drawMosaicRegion(painter, screenPixmap_, rect.translated(selectionRect_.topLeft()));
+    }
+    if (mosaicMode_ && drawingAnnotation_) {
+        drawMosaicRegion(painter, screenPixmap_, normalizedAnnotationRect());
+    }
 }
 
 void ScreenshotOverlay::drawTextAnnotations(QPainter &painter, const QPoint &offset) const {
@@ -618,6 +700,9 @@ QPixmap ScreenshotOverlay::renderedSelectionPixmap() const {
 
     QPainter painter(&pixmap);
     painter.setRenderHint(QPainter::Antialiasing, true);
+    for (const QRect &rect : mosaicRects_) {
+        drawMosaicRegion(painter, pixmap, rect);
+    }
     for (const QRect &rect : annotationRects_) {
         painter.setBrush(Qt::NoBrush);
         painter.setPen(QPen(QColor(239, 68, 68, 70), 4.0, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
