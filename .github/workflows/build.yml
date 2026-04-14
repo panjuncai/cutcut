@@ -10,6 +10,7 @@ on:
 env:
   QT_VERSION: '6.6.1'
   APP_NAME: 'CutCut'
+  MACOS_DEPLOYMENT_TARGET: '13.0'
 
 jobs:
   macos:
@@ -27,13 +28,13 @@ jobs:
           cache: true
 
       - name: Configure arm64
-        run: cmake -S . -B build-arm64 -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=arm64
+        run: cmake -S . -B build-arm64 -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=${{ env.MACOS_DEPLOYMENT_TARGET }}
 
       - name: Build arm64
         run: cmake --build build-arm64 --config Release
 
       - name: Configure x86_64
-        run: cmake -S . -B build-x86 -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=x86_64
+        run: cmake -S . -B build-x86 -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=x86_64 -DCMAKE_OSX_DEPLOYMENT_TARGET=${{ env.MACOS_DEPLOYMENT_TARGET }}
 
       - name: Build x86_64
         run: cmake --build build-x86 --config Release
