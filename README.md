@@ -200,4 +200,4 @@ git push origin v1.0.0
 
 ## License
 
-仓库当前未提供明确的开源许可证；如需公开分发，建议补充 `LICENSE` 文件。
+本项目基于 [MIT License](./LICENSE) 开源。
