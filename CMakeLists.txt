@@ -28,5 +28,5 @@ add_executable(${PROJECT_NAME} ${PROJECT_SOURCES})
 target_link_libraries(${PROJECT_NAME} PRIVATE Qt${QT_VERSION_MAJOR}::Widgets Qt${QT_VERSION_MAJOR}::Gui Qt${QT_VERSION_MAJOR}::Svg)
 
 if(APPLE)
-    target_link_libraries(${PROJECT_NAME} PRIVATE "-framework Carbon")
+    target_link_libraries(${PROJECT_NAME} PRIVATE "-framework Carbon" "-framework CoreGraphics")
 endif()

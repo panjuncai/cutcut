@@ -7,6 +7,7 @@
 #include <QClipboard>
 #include <QGuiApplication>
 #include <QMenu>
+#include <QMessageBox>
 #include <QPainter>
 #include <QScreen>
 
@@ -15,6 +16,7 @@
 #endif
 #ifdef Q_OS_MAC
 #include <Carbon/Carbon.h>
+#include <CoreGraphics/CoreGraphics.h>
 #endif
 
 namespace {
@@ -97,12 +99,23 @@ void AppController::startCapture() {
     if (overlay_->isVisible()) {
         return;
     }
+#ifdef Q_OS_MAC
+    // A non-null screen image does not prove access to other apps' windows.
+    // Check permission before displaying the full-desktop overlay.
+    if (__builtin_available(macOS 10.15, *)) {
+        if (!CGPreflightScreenCaptureAccess() && !CGRequestScreenCaptureAccess()) {
+            return;
+        }
+    }
+#endif
     const QRect geometry = virtualScreenGeometry();
     if (geometry.isNull()) {
         return;
     }
     const QPixmap screen = captureVirtualScreen(geometry);
     if (screen.isNull()) {
+        QMessageBox::warning(nullptr, tr("Capture Failed"),
+                             tr("Could not capture the screen. Check screen recording permission and try again."));
         return;
     }
     overlay_->beginCapture(screen, geometry);
@@ -261,7 +274,11 @@ QPixmap AppController::captureVirtualScreen(const QRect &geometry) const {
     for (QScreen *screen : QGuiApplication::screens()) {
         const QRect screenRect = screen->geometry();
         const QPoint targetPos = screenRect.topLeft() - geometry.topLeft();
-        painter.drawPixmap(targetPos, screen->grabWindow(0));
+        const QPixmap captured = screen->grabWindow(0);
+        if (captured.isNull()) {
+            return {};
+        }
+        painter.drawPixmap(targetPos, captured);
     }
     painter.end();
     return canvas;
