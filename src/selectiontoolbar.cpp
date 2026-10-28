@@ -228,7 +228,7 @@ SelectionToolbar::SelectionToolbar(QWidget *parent)
     undoButton_ = makeIconButton(makeUndoIcon(), tr("撤销"));
     pinButton_ = makeIconButton(makePinIcon(), tr("钉图"));
     copyButton_ = makeIconButton(makeCheckIcon(), tr("复制"));
-    closeButton_ = makeIconButton(makeCloseIcon(), tr("取消截图"));
+    closeButton_ = makeIconButton(makeCloseIcon(), tr("取消"));
     rectangleButton_->setCheckable(true);
     arrowButton_->setCheckable(true);
     textButton_->setCheckable(true);
