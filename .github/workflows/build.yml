@@ -10,7 +10,7 @@ on:
 env:
   QT_VERSION: '6.6.1'
   APP_NAME: 'CutCut'
-  APP_VERSION: '1.0.2'
+  APP_VERSION: '1.0.3'
   MACOS_DEPLOYMENT_TARGET: '13.0'
 
 jobs:
