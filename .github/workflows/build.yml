@@ -118,10 +118,21 @@ jobs:
         run: choco install ninja --no-progress
 
       - name: Configure
-        run: cmake -S . -B build -G "Ninja" -DCMAKE_BUILD_TYPE=Release
+        run: cmake -S . -B build -G "Ninja" -DCMAKE_BUILD_TYPE=Release -DCUTCUT_BUILD_TESTS=ON
 
       - name: Build
         run: cmake --build build --config Release
+
+      - name: Test screenshot pixel preservation
+        run: ctest --test-dir build --output-on-failure
+
+      - name: Verify GUI executable
+        shell: pwsh
+        run: |
+          $exe = [System.IO.File]::ReadAllBytes("build/cutcut.exe")
+          $peOffset = [BitConverter]::ToInt32($exe, 0x3c)
+          $subsystem = [BitConverter]::ToUInt16($exe, $peOffset + 24 + 68)
+          if ($subsystem -ne 2) { throw "Expected Windows GUI subsystem (2), got $subsystem" }
 
       - name: Deploy Qt runtime
         shell: pwsh

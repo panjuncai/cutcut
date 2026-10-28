@@ -1,6 +1,7 @@
 #include "screenshotoverlay.h"
 
 #include "selectiontoolbar.h"
+#include "screenimage.h"
 
 #include <QFontMetrics>
 #include <QKeyEvent>
@@ -27,7 +28,7 @@ void drawMosaicRegion(QPainter &painter, const QPixmap &source, const QRect &tar
         return;
     }
 
-    const QPixmap region = source.copy(targetRect);
+    const QPixmap region = ScreenImage::crop(source, targetRect);
     if (region.isNull()) {
         return;
     }
@@ -35,8 +36,8 @@ void drawMosaicRegion(QPainter &painter, const QPixmap &source, const QRect &tar
     const QSize scaledSize(std::max(1, targetRect.width() / kMosaicCellSize),
                            std::max(1, targetRect.height() / kMosaicCellSize));
     const QPixmap downscaled = region.scaled(scaledSize, Qt::IgnoreAspectRatio, Qt::FastTransformation);
-    const QPixmap pixelated = downscaled.scaled(targetRect.size(), Qt::IgnoreAspectRatio, Qt::FastTransformation);
-    painter.drawPixmap(targetRect.topLeft(), pixelated);
+    const QPixmap pixelated = downscaled.scaled(region.size(), Qt::IgnoreAspectRatio, Qt::FastTransformation);
+    painter.drawPixmap(QRectF(targetRect), pixelated, QRectF(pixelated.rect()));
 }
 
 void drawArrowShape(QPainter &painter, const QPoint &start, const QPoint &end, const QPoint &offset = QPoint()) {
@@ -185,7 +186,10 @@ void ScreenshotOverlay::paintEvent(QPaintEvent *) {
 
     const QRect selection = normalizedSelection();
     if (!selection.isNull()) {
-        painter.drawPixmap(selection.topLeft(), screenPixmap_.copy(selection));
+        painter.save();
+        painter.setClipRect(selection);
+        painter.drawPixmap(0, 0, screenPixmap_);
+        painter.restore();
         drawMosaicAnnotations(painter);
         painter.setPen(QPen(Qt::white, 1));
         painter.drawRect(selection.adjusted(0, 0, -1, -1));
@@ -802,7 +806,7 @@ void ScreenshotOverlay::drawTextAnnotations(QPainter &painter, const QPoint &off
 }
 
 QPixmap ScreenshotOverlay::renderedSelectionPixmap() const {
-    QPixmap pixmap = screenPixmap_.copy(selectionRect_);
+    QPixmap pixmap = ScreenImage::crop(screenPixmap_, selectionRect_);
     if (pixmap.isNull()) {
         return pixmap;
     }

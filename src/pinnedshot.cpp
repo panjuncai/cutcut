@@ -13,14 +13,16 @@ PinnedShot::PinnedShot(const QPixmap &pixmap, QWidget *parent)
     setAttribute(Qt::WA_DeleteOnClose);
     setAttribute(Qt::WA_TranslucentBackground);
     setAttribute(Qt::WA_ShowWithoutActivating);
-    resize(pixmap_.size() + QSize(kGlowMargin * 2, kGlowMargin * 2));
+    const QSize logicalSize = (QSizeF(pixmap_.size()) / pixmap_.devicePixelRatio()).toSize();
+    resize(logicalSize + QSize(kGlowMargin * 2, kGlowMargin * 2));
 }
 
 void PinnedShot::paintEvent(QPaintEvent *) {
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing);
     painter.setRenderHint(QPainter::SmoothPixmapTransform);
-    const QRectF imageRect(QPointF(kGlowMargin, kGlowMargin), QSizeF(pixmap_.size()));
+    const QRectF imageRect(QPointF(kGlowMargin, kGlowMargin),
+                          QSizeF(pixmap_.size()) / pixmap_.devicePixelRatio());
     // Paint the glow in transparent padding so it never covers the screenshot.
     painter.setBrush(Qt::NoBrush);
     for (int spread = kGlowMargin; spread > 0; --spread) {

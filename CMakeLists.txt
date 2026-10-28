@@ -16,6 +16,7 @@ set(PROJECT_SOURCES
     src/main.cpp
     src/appcontroller.h
     src/appcontroller.cpp
+    src/screenimage.h
     src/screenshotoverlay.h
     src/screenshotoverlay.cpp
     src/pinnedshot.h
@@ -27,6 +28,7 @@ set(PROJECT_SOURCES
 add_executable(${PROJECT_NAME} ${PROJECT_SOURCES})
 
 if(WIN32)
+    set_target_properties(${PROJECT_NAME} PROPERTIES WIN32_EXECUTABLE TRUE)
     target_sources(${PROJECT_NAME} PRIVATE installer/cutcut.rc)
 endif()
 
@@ -34,4 +36,21 @@ target_link_libraries(${PROJECT_NAME} PRIVATE Qt${QT_VERSION_MAJOR}::Widgets Qt$
 
 if(APPLE)
     target_link_libraries(${PROJECT_NAME} PRIVATE "-framework Carbon" "-framework CoreGraphics")
+endif()
+
+option(CUTCUT_BUILD_TESTS "Build screenshot pixel-preservation tests" OFF)
+if(CUTCUT_BUILD_TESTS)
+    enable_testing()
+    find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Test)
+    add_executable(screenimage_tests
+        tests/screenimage_tests.cpp
+        src/screenshotoverlay.cpp src/screenshotoverlay.h
+        src/selectiontoolbar.cpp src/selectiontoolbar.h
+        src/pinnedshot.cpp src/pinnedshot.h
+    )
+    target_include_directories(screenimage_tests PRIVATE src)
+    target_link_libraries(screenimage_tests PRIVATE Qt${QT_VERSION_MAJOR}::Widgets
+        Qt${QT_VERSION_MAJOR}::Svg Qt${QT_VERSION_MAJOR}::Test)
+    add_test(NAME screenimage_tests COMMAND screenimage_tests)
+    set_tests_properties(screenimage_tests PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 endif()

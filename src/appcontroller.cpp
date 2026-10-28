@@ -2,6 +2,7 @@
 
 #include "screenshotoverlay.h"
 #include "pinnedshot.h"
+#include "screenimage.h"
 
 #include <QApplication>
 #include <QClipboard>
@@ -258,18 +259,13 @@ QPixmap AppController::captureVirtualScreen(const QRect &geometry) const {
         return {};
     }
 
-    QPixmap canvas(geometry.size());
-    canvas.fill(Qt::transparent);
-    QPainter painter(&canvas);
+    QVector<ScreenImage::Capture> captures;
     for (QScreen *screen : QGuiApplication::screens()) {
-        const QRect screenRect = screen->geometry();
-        const QPoint targetPos = screenRect.topLeft() - geometry.topLeft();
         const QPixmap captured = screen->grabWindow(0);
         if (captured.isNull()) {
             return {};
         }
-        painter.drawPixmap(targetPos, captured);
+        captures.append({screen->geometry(), captured});
     }
-    painter.end();
-    return canvas;
+    return ScreenImage::compose(geometry, captures);
 }

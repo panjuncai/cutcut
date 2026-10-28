@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QColor>
+#include <QPointer>
 #include <QVector>
 #include <QWidget>
 
@@ -51,7 +52,7 @@ private:
     QRect overlayRect_;
     bool dragging_ = false;
     QPoint dragOffset_;
-    QWidget *settingsPanel_ = nullptr;
+    QPointer<QWidget> settingsPanel_;
     QComboBox *fontSizeCombo_ = nullptr;
     QVector<QToolButton *> colorButtons_;
     QToolButton *rectangleButton_ = nullptr;
