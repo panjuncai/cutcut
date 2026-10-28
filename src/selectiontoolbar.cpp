@@ -215,14 +215,14 @@ SelectionToolbar::SelectionToolbar(QWidget *parent)
 
     auto *grip = new GripHandle(this);
 
-    rectangleButton_ = makeIconButton(makeRectangleIcon(), tr("Rectangle"));
-    arrowButton_ = makeIconButton(makeArrowIcon(), tr("Arrow"));
-    textButton_ = makeIconButton(makeTypeIcon(), tr("Text"));
-    mosaicButton_ = makeIconButton(makeMosaicIcon(), tr("Mosaic"));
-    undoButton_ = makeIconButton(makeUndoIcon(), tr("Undo"));
-    pinButton_ = makeIconButton(makePinIcon(), tr("Pin"));
-    copyButton_ = makeIconButton(makeCheckIcon(), tr("Copy"));
-    closeButton_ = makeIconButton(makeCloseIcon(), tr("Cancel"));
+    rectangleButton_ = makeIconButton(makeRectangleIcon(), tr("矩形"));
+    arrowButton_ = makeIconButton(makeArrowIcon(), tr("箭头"));
+    textButton_ = makeIconButton(makeTypeIcon(), tr("文字"));
+    mosaicButton_ = makeIconButton(makeMosaicIcon(), tr("马赛克"));
+    undoButton_ = makeIconButton(makeUndoIcon(), tr("撤销"));
+    pinButton_ = makeIconButton(makePinIcon(), tr("钉图"));
+    copyButton_ = makeIconButton(makeCheckIcon(), tr("复制"));
+    closeButton_ = makeIconButton(makeCloseIcon(), tr("取消截图"));
     rectangleButton_->setCheckable(true);
     arrowButton_->setCheckable(true);
     textButton_->setCheckable(true);
