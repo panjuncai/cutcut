@@ -17,6 +17,23 @@ constexpr int kButtonSize = 34;
 constexpr int kIconSize = 22;
 constexpr int kSettingsSwatchSize = 24;
 
+QIcon makeSvgIcon(const char *svg, const QSize &size) {
+    QSvgRenderer renderer{QByteArray(svg)};
+    QIcon icon;
+    // Render each density directly from vectors; never enlarge the 1x bitmap.
+    for (qreal ratio : {1.0, 1.25, 1.5, 1.75, 2.0, 2.5, 3.0, 4.0}) {
+        QPixmap pixmap(qRound(size.width() * ratio), qRound(size.height() * ratio));
+        pixmap.setDevicePixelRatio(ratio);
+        pixmap.fill(Qt::transparent);
+        QPainter painter(&pixmap);
+        painter.setRenderHint(QPainter::Antialiasing);
+        renderer.render(&painter, QRectF(QPointF(), QSizeF(size)));
+        painter.end();
+        icon.addPixmap(pixmap);
+    }
+    return icon;
+}
+
 class GripHandle final : public QWidget {
 public:
     explicit GripHandle(QWidget *parent = nullptr)
@@ -38,30 +55,13 @@ protected:
   <circle cx="13.5" cy="11.3" r="1.05" fill="#97A0B2"/>
 </svg>
 )svg";
-            QPixmap pixmap(18, 18);
-            pixmap.fill(Qt::transparent);
-            QSvgRenderer renderer{QByteArray(kGripSvg)};
-            QPainter painter(&pixmap);
-            renderer.render(&painter);
-            return QIcon(pixmap);
+            return makeSvgIcon(kGripSvg, QSize(18, 18));
         }();
 
         QPainter painter(this);
         gripIcon.paint(&painter, rect(), Qt::AlignCenter);
     }
 };
-
-QIcon makeSvgIcon(const char *svg, const QSize &size) {
-    QPixmap pixmap(size);
-    pixmap.fill(Qt::transparent);
-
-    QSvgRenderer renderer{QByteArray(svg)};
-    QPainter painter(&pixmap);
-    painter.setRenderHint(QPainter::Antialiasing);
-    renderer.render(&painter, QRectF(QPointF(0, 0), QSizeF(size)));
-
-    return QIcon(pixmap);
-}
 
 QIcon makePinIcon() {
     constexpr auto kPinSvg = R"svg(

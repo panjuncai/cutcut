@@ -6,6 +6,7 @@
 #include <QMouseEvent>
 #include <QSignalSpy>
 #include <QScopeGuard>
+#include <QToolButton>
 #include <QtTest>
 
 namespace {
@@ -41,6 +42,29 @@ void drag(QWidget &widget, const QPoint &from, const QPoint &to) {
 class ScreenImageTests : public QObject {
     Q_OBJECT
 private slots:
+    void toolbarIcons_data() {
+        selectionAndPin_data();
+    }
+
+    void toolbarIcons() {
+        QFETCH(qreal, ratio);
+        QWidget parent;
+        SelectionToolbar toolbar(&parent);
+        int count = 0;
+        for (QToolButton *button : toolbar.findChildren<QToolButton *>()) {
+            if (button->icon().isNull()) {
+                continue;
+            }
+            const QSize logicalSize = button->iconSize();
+            const QPixmap image = button->icon().pixmap(logicalSize, ratio);
+            QCOMPARE(image.size(), QSize(qRound(logicalSize.width() * ratio),
+                                         qRound(logicalSize.height() * ratio)));
+            QVERIFY(qAbs(image.devicePixelRatio() - ratio) < 0.05);
+            ++count;
+        }
+        QCOMPARE(count, 8);
+    }
+
     void laptop150Percent() {
         const QPixmap native = patternedImage(QSize(1280, 800), 1.5);
         const QPixmap composed = ScreenImage::compose(QRect(0, 0, 1280, 800),
