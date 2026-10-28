@@ -116,9 +116,15 @@ QIcon makeTypeIcon() {
 QIcon makeMosaicIcon() {
     constexpr auto kMosaicSvg = R"svg(
 <svg width="22" height="22" viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <path d="M11 3.2V18.8" stroke="#374151" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M3.2 11H18.8" stroke="#374151" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"/>
-  <rect x="3.2" y="3.2" width="15.6" height="15.6" rx="1.8" stroke="#374151" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="3" y="3" width="4" height="4" rx="0.5" fill="#374151"/>
+  <rect x="9" y="3" width="4" height="4" rx="0.5" fill="#9CA3AF"/>
+  <rect x="16" y="2" width="4" height="4" rx="0.5" fill="#6B7280"/>
+  <rect x="3" y="9" width="4" height="4" rx="0.5" fill="#9CA3AF"/>
+  <rect x="9" y="9" width="4" height="4" rx="0.5" fill="#4B5563"/>
+  <rect x="15" y="9" width="4" height="4" rx="0.5" fill="#D1D5DB"/>
+  <rect x="3" y="15" width="4" height="4" rx="0.5" fill="#4B5563"/>
+  <rect x="9" y="15" width="4" height="4" rx="0.5" fill="#D1D5DB"/>
+  <rect x="15" y="15" width="4" height="4" rx="0.5" fill="#6B7280"/>
 </svg>
 )svg";
     return makeSvgIcon(kMosaicSvg, QSize(kIconSize, kIconSize));
