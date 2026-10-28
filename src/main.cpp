@@ -5,7 +5,7 @@
 
 int main(int argc, char *argv[]) {
     QApplication app(argc, argv);
-    QApplication::setWindowIcon(QIcon(QStringLiteral(":/icons/cutcut.svg")));
+    QApplication::setWindowIcon(QIcon(QStringLiteral(":/icons/cutcut.png")));
     QApplication::setQuitOnLastWindowClosed(false);
 
     AppController controller;

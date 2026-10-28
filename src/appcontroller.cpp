@@ -21,7 +21,8 @@
 
 namespace {
 QIcon buildTrayIcon() {
-    return QIcon(QStringLiteral(":/icons/cutcut.svg"));
+    // PNG works without the optional SVG icon-engine deployment plugin.
+    return QIcon(QStringLiteral(":/icons/cutcut.png"));
 }
 }
 
