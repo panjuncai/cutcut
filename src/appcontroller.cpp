@@ -6,11 +6,13 @@
 
 #include <QApplication>
 #include <QClipboard>
+#include <QCursor>
 #include <QGuiApplication>
 #include <QMenu>
 #include <QMessageBox>
 #include <QPainter>
 #include <QScreen>
+#include <QTimer>
 
 #ifdef Q_OS_WIN
 #include <windows.h>
@@ -71,7 +73,7 @@ bool AppController::initialize() {
 void AppController::setupTray() {
     tray_ = new QSystemTrayIcon(buildTrayIcon(), this);
 
-    auto *menu = new QMenu;
+    auto *menu = new QMenu(overlay_);
     QAction *captureAction = menu->addAction(tr("Capture (F1)"));
     QAction *pinAction = menu->addAction(tr("Pin (F3)"));
     menu->addSeparator();
@@ -81,8 +83,25 @@ void AppController::setupTray() {
     connect(pinAction, &QAction::triggered, this, &AppController::pinCapture);
     connect(quitAction, &QAction::triggered, qApp, &QApplication::quit);
 
+    connect(tray_, &QSystemTrayIcon::activated, this,
+            [this, menu](QSystemTrayIcon::ActivationReason reason) {
+        if (reason == QSystemTrayIcon::DoubleClick) {
+            menu->hide();
+            // Let the tray interaction finish before taking the desktop snapshot.
+            QTimer::singleShot(100, this, &AppController::startCapture);
+        }
+#ifdef Q_OS_MAC
+        else if (reason == QSystemTrayIcon::Context) {
+            menu->popup(QCursor::pos());
+        }
+#endif
+    });
+#ifndef Q_OS_MAC
     tray_->setContextMenu(menu);
-    tray_->setToolTip(tr("CutCut"));
+#endif
+    // On macOS an assigned native menu consumes mouse presses and prevents
+    // DoubleClick activation, so open the menu explicitly on right-click above.
+    tray_->setToolTip(tr("CutCut（双击截图，右键打开菜单）"));
     tray_->show();
 }
 
