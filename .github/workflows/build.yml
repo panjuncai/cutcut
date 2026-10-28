@@ -50,6 +50,7 @@ jobs:
           APP="dist/${{ env.APP_NAME }}.app"
           mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
           cp build-universal/cutcut "$APP/Contents/MacOS/${{ env.APP_NAME }}"
+          cp assets/cutcut.icns "$APP/Contents/Resources/cutcut.icns"
           cat <<PLIST > "$APP/Contents/Info.plist"
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -63,6 +64,8 @@ jobs:
             <string>com.cutcut.app</string>
             <key>CFBundleName</key>
             <string>CutCut</string>
+            <key>CFBundleIconFile</key>
+            <string>cutcut.icns</string>
             <key>CFBundleVersion</key>
             <string>1.0.0</string>
             <key>CFBundleShortVersionString</key>

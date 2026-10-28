@@ -21,18 +21,7 @@
 
 namespace {
 QIcon buildTrayIcon() {
-    QPixmap pixmap(48, 48);
-    pixmap.fill(Qt::transparent);
-    QPainter painter(&pixmap);
-    painter.setRenderHint(QPainter::Antialiasing);
-    painter.setBrush(QColor(220, 40, 40));
-    painter.setPen(Qt::NoPen);
-    painter.drawRoundedRect(pixmap.rect().adjusted(6, 6, -6, -6), 10, 10);
-    painter.setPen(QPen(Qt::white, 4, Qt::SolidLine, Qt::RoundCap));
-    painter.drawLine(QPoint(14, 34), QPoint(34, 14));
-    painter.drawLine(QPoint(22, 14), QPoint(34, 14));
-    painter.end();
-    return QIcon(pixmap);
+    return QIcon(QStringLiteral(":/icons/cutcut.svg"));
 }
 }
 

@@ -12,6 +12,7 @@ find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Widgets Gui Svg)
 find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Widgets Gui Svg)
 
 set(PROJECT_SOURCES
+    assets/icons.qrc
     src/main.cpp
     src/appcontroller.h
     src/appcontroller.cpp
@@ -24,6 +25,10 @@ set(PROJECT_SOURCES
 )
 
 add_executable(${PROJECT_NAME} ${PROJECT_SOURCES})
+
+if(WIN32)
+    target_sources(${PROJECT_NAME} PRIVATE installer/cutcut.rc)
+endif()
 
 target_link_libraries(${PROJECT_NAME} PRIVATE Qt${QT_VERSION_MAJOR}::Widgets Qt${QT_VERSION_MAJOR}::Gui Qt${QT_VERSION_MAJOR}::Svg)
 

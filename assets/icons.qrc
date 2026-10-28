@@ -1,0 +1,5 @@
+<RCC>
+  <qresource prefix="/icons">
+    <file alias="cutcut.svg">cutcut.svg</file>
+  </qresource>
+</RCC>
