@@ -35,6 +35,10 @@ endif()
 target_link_libraries(${PROJECT_NAME} PRIVATE Qt${QT_VERSION_MAJOR}::Widgets Qt${QT_VERSION_MAJOR}::Gui Qt${QT_VERSION_MAJOR}::Svg)
 
 if(APPLE)
+    enable_language(OBJCXX)
+    target_sources(${PROJECT_NAME} PRIVATE src/maccapture.mm src/maccapture.h)
+    set_source_files_properties(src/maccapture.mm PROPERTIES COMPILE_FLAGS "-fobjc-arc")
+    target_link_libraries(${PROJECT_NAME} PRIVATE "-framework ScreenCaptureKit")
     target_link_libraries(${PROJECT_NAME} PRIVATE "-framework Carbon" "-framework CoreGraphics")
 endif()
 

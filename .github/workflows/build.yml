@@ -10,7 +10,7 @@ on:
 env:
   QT_VERSION: '6.6.1'
   APP_NAME: 'CutCut'
-  APP_VERSION: '1.0.5'
+  APP_VERSION: '1.0.6'
   MACOS_DEPLOYMENT_TARGET: '13.0'
 
 jobs:
@@ -80,6 +80,12 @@ jobs:
             <string>${{ env.APP_VERSION }}</string>
             <key>CFBundleShortVersionString</key>
             <string>${{ env.APP_VERSION }}</string>
+            <key>CFBundlePackageType</key>
+            <string>APPL</string>
+            <key>LSMinimumSystemVersion</key>
+            <string>${{ env.MACOS_DEPLOYMENT_TARGET }}</string>
+            <key>NSScreenCaptureUsageDescription</key>
+            <string>CutCut needs screen access to take screenshots of your desktop and application windows.</string>
             <key>LSUIElement</key>
             <true/>
           </dict>
@@ -87,7 +93,15 @@ jobs:
           PLIST
 
       - name: Create DMG
-        run: macdeployqt "dist/${{ env.APP_NAME }}.app" -dmg
+        run: |
+          APP="dist/${{ env.APP_NAME }}.app"
+          macdeployqt "$APP"
+          codesign --force --deep --sign - --identifier com.cutcut.app "$APP"
+          codesign --verify --deep --strict "$APP"
+          mkdir -p build-dmg
+          ditto "$APP" "build-dmg/${{ env.APP_NAME }}.app"
+          ln -s /Applications build-dmg/Applications
+          hdiutil create -volname CutCut -srcfolder build-dmg -ov -format UDZO dist/CutCut.dmg
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4

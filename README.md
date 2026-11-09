@@ -207,3 +207,11 @@ git push origin v1.0.0
 ## License
 
 本项目基于 [MIT License](./LICENSE) 开源。
+
+## macOS 截图权限排查
+
+- macOS 14 及以上使用 ScreenCaptureKit 截图，macOS 13 保留兼容抓屏路径。
+- 更新前请从右键菜单彻底退出旧版 CutCut，再将新版拖入 Applications；请从 Applications 启动。
+- 首次授权如未立即生效，请彻底退出并重新打开 CutCut。右键菜单的“屏幕录制权限设置”可打开系统授权页面。
+- 若旧版权限记录失效，请在系统“屏幕录制”列表移除旧的 CutCut，再添加 `/Applications/CutCut.app` 并重新启动。
+- 发布包会对整个应用包进行 ad-hoc 签名及验证。当前没有 Developer ID 签名和 Apple 公证，系统仍可能在替换版本后要求重新授权。

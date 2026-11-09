@@ -7,6 +7,10 @@
 #include <QApplication>
 #include <QClipboard>
 #include <QCursor>
+#include <QDesktopServices>
+#include <QDebug>
+#include <QPointer>
+#include <QUrl>
 #include <QGuiApplication>
 #include <QMenu>
 #include <QMessageBox>
@@ -20,6 +24,7 @@
 #ifdef Q_OS_MAC
 #include <Carbon/Carbon.h>
 #include <CoreGraphics/CoreGraphics.h>
+#include "maccapture.h"
 #endif
 
 namespace {
@@ -64,8 +69,7 @@ AppController::~AppController() {
 bool AppController::initialize() {
     setupTray();
     if (!registerHotkeys()) {
-        tray_->showMessage(tr("CutCut"), tr("Failed to register global hotkeys."));
-        return false;
+        tray_->showMessage(tr("CutCut"), tr("全局快捷键被占用，请单击 CutCut 图标截图。"));
     }
     return true;
 }
@@ -76,6 +80,13 @@ void AppController::setupTray() {
     auto *menu = new QMenu(overlay_);
     QAction *captureAction = menu->addAction(tr("Capture (F1)"));
     QAction *pinAction = menu->addAction(tr("Pin (F3)"));
+#ifdef Q_OS_MAC
+    QAction *permissionAction = menu->addAction(tr("屏幕录制权限设置"));
+    connect(permissionAction, &QAction::triggered, this, [this] {
+        macCaptureNeedsPermission_ = false;
+        QDesktopServices::openUrl(QUrl(QStringLiteral("x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture")));
+    });
+#endif
     menu->addSeparator();
     QAction *quitAction = menu->addAction(tr("Quit"));
 
@@ -91,6 +102,41 @@ void AppController::setupTray() {
             QTimer::singleShot(100, this, &AppController::startCapture);
         }
 #ifdef Q_OS_MAC
+    if (macCaptureInProgress_ || macCaptureNeedsPermission_) {
+        return;
+    }
+    if (__builtin_available(macOS 14.0, *)) {
+        QVector<MacCaptureRequest> requests;
+        for (QScreen *screen : QGuiApplication::screens()) {
+            const QRect rect = screen->geometry();
+            CGDirectDisplayID display = 0;
+            uint32_t count = 0;
+            CGGetDisplaysWithPoint(CGPointMake(rect.center().x(), rect.center().y()), 1, &display, &count);
+            if (!count) { return; }
+            requests.append({display, rect, screen->devicePixelRatio()});
+        }
+        const QRect geometry = virtualScreenGeometry();
+        macCaptureInProgress_ = true;
+        const QPointer<AppController> guard(this);
+        captureMacScreens(requests, [guard, geometry](QVector<MacCaptureResult> images, QString error, bool permissionDenied) {
+            if (!guard) { return; }
+            guard->macCaptureInProgress_ = false;
+            if (!error.isEmpty()) {
+                guard->macCaptureNeedsPermission_ = permissionDenied;
+                qWarning() << "ScreenCaptureKit:" << error;
+                guard->tray_->showMessage(tr("CutCut"),
+                    tr("截图失败。请右键图标检查屏幕录制权限；首次授权后请退出并重新打开 CutCut。"));
+                return;
+            }
+            QVector<ScreenImage::Capture> captures;
+            for (const auto &image : images) {
+                captures.append({image.geometry, QPixmap::fromImage(image.image)});
+            }
+            const QPixmap pixmap = ScreenImage::compose(geometry, captures);
+            if (!pixmap.isNull()) { guard->overlay_->beginCapture(pixmap, geometry); }
+        });
+        return;
+    }
         else if (reason == QSystemTrayIcon::Context) {
             menu->popup(QCursor::pos());
         }
@@ -113,6 +159,7 @@ void AppController::startCapture() {
     // Check permission before displaying the full-desktop overlay.
     if (__builtin_available(macOS 10.15, *)) {
         if (!CGPreflightScreenCaptureAccess() && !CGRequestScreenCaptureAccess()) {
+            macCaptureNeedsPermission_ = true;
             return;
         }
     }

@@ -49,5 +49,7 @@ private:
 #ifdef Q_OS_MAC
     struct MacHotkeyData;
     MacHotkeyData *macHotkeys_ = nullptr;
+    bool macCaptureInProgress_ = false;
+    bool macCaptureNeedsPermission_ = false;
 #endif
 };
