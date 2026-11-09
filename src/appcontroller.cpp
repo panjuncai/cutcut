@@ -85,7 +85,7 @@ void AppController::setupTray() {
 
     connect(tray_, &QSystemTrayIcon::activated, this,
             [this, menu](QSystemTrayIcon::ActivationReason reason) {
-        if (reason == QSystemTrayIcon::DoubleClick) {
+        if (reason == QSystemTrayIcon::Trigger) {
             menu->hide();
             // Let the tray interaction finish before taking the desktop snapshot.
             QTimer::singleShot(100, this, &AppController::startCapture);
@@ -99,9 +99,8 @@ void AppController::setupTray() {
 #ifndef Q_OS_MAC
     tray_->setContextMenu(menu);
 #endif
-    // On macOS an assigned native menu consumes mouse presses and prevents
-    // DoubleClick activation, so open the menu explicitly on right-click above.
-    tray_->setToolTip(tr("CutCut（双击截图，右键打开菜单）"));
+    // On macOS a native menu consumes left-clicks; open it only on right-click.
+    tray_->setToolTip(tr("CutCut（单击截图，右键打开菜单）"));
     tray_->show();
 }
 
