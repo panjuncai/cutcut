@@ -56,8 +56,10 @@ void captureNext(SCShareableContent *content, QVector<MacCaptureRequest> request
 }
 }
 
-void captureMacScreens(const QVector<MacCaptureRequest> &requests, MacCaptureCallback callback) {
+void captureMacScreens(QVector<MacCaptureRequest> requests, MacCaptureCallback callback) {
     if (@available(macOS 14.0, *)) {
+        // Pass requests by value: Objective-C blocks capture reference parameters
+        // as references, but the caller's local request list dies before completion.
         // ScreenCaptureKit performs its own authorization. A stale legacy
         // CGPreflightScreenCaptureAccess result must not block a valid capture.
         [SCShareableContent getShareableContentExcludingDesktopWindows:NO onScreenWindowsOnly:YES

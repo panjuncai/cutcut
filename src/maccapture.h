@@ -15,4 +15,4 @@ struct MacCaptureResult {
 };
 using MacCaptureCallback = std::function<void(QVector<MacCaptureResult>, QString, bool)>;
 // Completion runs on the GUI thread. No QPixmap is created on capture threads.
-void captureMacScreens(const QVector<MacCaptureRequest> &requests, MacCaptureCallback callback);
+void captureMacScreens(QVector<MacCaptureRequest> requests, MacCaptureCallback callback);
